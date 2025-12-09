@@ -6,6 +6,7 @@ import math
 from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi import Header
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv  
@@ -17,6 +18,7 @@ AZURE_ENDPOINT = os.getenv("AZURE_ENDPOINT")
 AZURE_API_KEY = os.getenv("AZURE_API_KEY")
 AZURE_DEPLOYMENT = os.getenv("AZURE_DEPLOYMENT")
 AZURE_API_VERSION = os.getenv("AZURE_API_VERSION")
+API_PASSWORD = os.getenv("API_PASSWORD")
 
 # Where templates are stored (adjust if your files are elsewhere)
 PROMPT1_PATH = os.getenv("PROMPT1_PATH", "prompt1.txt")
@@ -63,6 +65,13 @@ class CarInfo(BaseModel):
     buyer: Optional[str] = ""
     person_type: str  # "person1" or "person2" (decides which prompt to use)
 
+
+
+async def verify_password(password: str = Header(None)):
+    if API_PASSWORD is None:
+        raise HTTPException(500, "API password not set on server.")
+    if password != API_PASSWORD:
+        raise HTTPException(401, "Unauthorized")
 
 def fill_placeholders(template: str, fields: dict) -> str:
     """
@@ -113,7 +122,11 @@ async def call_azure_chat(messages: list) -> str:
 
 
 @app.post("/generate-message")
-async def generate_message(car: CarInfo):
+async def generate_message(
+    car: CarInfo,
+    password: str = Header(None)
+):
+    await verify_password(password)
     # 1) choose template
     prompt_template = PROMPT_TEMPLATES.get(car.person_type)
     if not prompt_template:
