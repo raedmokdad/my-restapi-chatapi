@@ -105,7 +105,7 @@ async def call_azure_chat(messages: list) -> str:
         "messages": messages,
         # you can expose temperature/max_tokens via env or keep fixed:
         "temperature": 0.3,
-        "max_tokens": 70,
+        "max_tokens": 40,
     }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
