@@ -104,7 +104,7 @@ async def call_azure_chat(messages: list) -> str:
     body = {
         "messages": messages,
         # you can expose temperature/max_tokens via env or keep fixed:
-        "temperature": 0.5,
+        "temperature": 0.3,
         "max_tokens": 70,
     }
 
