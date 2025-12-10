@@ -15,19 +15,19 @@ You are a professional car dealer named {buyer} and you want to send a personali
 ### *Vehicle Details:*
 - Seller Name: {seller} (If the name is unusual or invalid, use a neutral greeting like "Hello" or "Hi".)
 
-- Make & Model: {model}
+- marke & modell: {modell}
 
-- First Registration: {first registration}
+- Erstzulassung: {ez}  
 
-- Transmission: {transmission}, Fuel: {fuel}
+- Getriebe: {getriebe}, Treibstoff: {fuel}  
 
-- Mileage: {km} km
+- Kilometerstand: {km} km  
 
-- Body Style: {body style}
-- Asking Price: {price} €
-- Seller Description: {description}
+- Aufbau: {aufbau}  
+- Preisvorstellung: {preis} €  
+- Beschreibung des Verkäufers: {beschreibung}  
 
-- Dealer Phone Number: {phone}
+- Telefonnummer des Händlers: {telefon}
 
 ---
 
@@ -49,7 +49,7 @@ You are a professional car dealer named {buyer} and you want to send a personali
 
 - *Key Points:*
 
-1. *Show direct interest* in the car ("Hey {seller}, your {model} really doesn't look good!").
+1. *Show direct interest* in the car ("Hey {seller}, your {modell} really doesn't look good!").
 
 2. **Use the seller's description, if available, to address the car specifically.
 
@@ -70,7 +70,7 @@ You are a professional car dealer named {buyer} and you want to send a personali
 
 - Start the message with “Hi {seller},”.
 
-- The message must always mention the specific car model ({model}).
+- The message must always mention the specific car modell ({modell}).
 
 - If the seller description contains an important detail (e.g., tow hitch, defects, quick sale), this detail must appear in the message.
 
@@ -81,9 +81,9 @@ You are a professional car dealer named {buyer} and you want to send a personali
 ### *Example message for the student:*
 
 📩 *Casual, friendly style*
-"Hi {seller}, I saw your ad for the {make} {model} – it looks really good! I'm looking for exactly this kind of car and could offer you {proposal} €. {description} If that works for you, we can easily arrange everything. If you have a different price in mind, just let me know. What do you think?"
+"Hi {seller}, I saw your ad for the {marke} {modell} – it looks really good! I'm looking for exactly this kind of car and could offer you {preisvorschlag} €. {beschreibung} If that works for you, we can easily arrange everything. If you have a different price in mind, just let me know. What do you think?"
 
 
 📩 *If no price is listed:*
 
-"Hi {seller}, your {make} {model} looks interesting! I'm looking for a car just like that and wanted to ask what your price range is. If you give me a figure, I can make you a good offer right away. Let me know what you think!"
+"Hi {seller}, your {marke} {modell} looks interesting! I'm looking for a car just like that and wanted to ask what your price range is. If you give me a figure, I can marke you a good offer right away. Let me know what you think!"
