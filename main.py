@@ -7,9 +7,13 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi import Header
-from pydantic import BaseModel
 import os
-from dotenv import load_dotenv  
+from dotenv import load_dotenv 
+from pydantic import BaseModel, Field
+from typing import Any, Dict
+from pathlib import Path
+
+
 # Load environment variables from .env file if it exists
 load_dotenv()
 
@@ -26,6 +30,31 @@ PROMPT2_PATH = os.getenv("PROMPT2_PATH", "prompt2.txt")
 PROMPT3_PATH = os.getenv("PROMPT3_PATH", "prompt3.txt")
 PROMPT4_PATH = os.getenv("PROMPT4_PATH", "prompt4.txt")
 MESSTYPE_PATH = os.getenv("MESSTYPE_PATH", "messagetype.txt")
+
+
+JSONS_DIR = Path("jsons")
+JSONS_DIR.mkdir(exist_ok=True)
+
+# Allow letters, numbers, hyphen, underscore, and dot (but we'll keep dot minimal)
+FILENAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+class CreateJsonRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="Filename (without path)")
+    proplist: Dict[str, Any] = Field(..., description="Arbitrary JSON object to store")
+
+def sanitize_filename(name: str) -> str:
+    """
+    Keep only safe characters. If name invalid after sanitization, raise ValueError.
+    This prevents '../' path traversal and weird chars.
+    """
+    if not FILENAME_RE.match(name):
+        # attempt to normalize by removing illegal chars
+        cleaned = re.sub(r"[^A-Za-z0-9_.-]", "_", name)
+        cleaned = cleaned.strip("._-")
+        if not cleaned:
+            raise ValueError("Invalid file name after sanitization.")
+        return cleaned[:100]  # enforce max length
+    return name
 
 if not (AZURE_ENDPOINT and AZURE_API_KEY):
     # For safety: app will start but will reject requests if keys missing
@@ -165,3 +194,34 @@ async def generate_message(
 
     # 5) return result (raw assistant text)
     return {"message": assistant_content}
+
+
+@app.post("/create-json", status_code=201)
+async def create_json(payload: CreateJsonRequest):
+    # sanitize
+    try:
+        safe_name = sanitize_filename(payload.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    filepath = JSONS_DIR / f"{safe_name}.json"
+
+    # Option: refuse overwrite — change logic if you want to overwrite
+    if filepath.exists():
+        raise HTTPException(status_code=409, detail=f"File '{safe_name}.json' already exists.")
+
+    # write file safely
+    try:
+        with filepath.open("w", encoding="utf-8") as f:
+            # Use ensure_ascii=False for proper UTF-8, indent for readability
+            json.dump(payload.proplist, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        # remove partial file if created
+        if filepath.exists():
+            try:
+                filepath.unlink()
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
+
+    return {"message": "created", "filename": str(filepath)}
