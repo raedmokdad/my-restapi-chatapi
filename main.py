@@ -181,33 +181,33 @@ async def generate_message(
         raise HTTPException(status_code=400, detail=f"Unknown person_type '{car.person_type}'. Valid: {list(PROMPT_TEMPLATES.keys())}")
     
     try:
-            prompt_json = load_json(car.person_type)  # load_json uses JSONS_DIR
-    
-            return {
-                "type": car.person_type,
-                "prompt_json": prompt_json,
-            }
+        # Load JSON from volume
+        prompt_json = load_json(car.person_type)  # uses JSONS_DIR
+
+        # Safely get 'proplist'; fallback to root if 'proplist' missing
+        data = prompt_json.get("proplist", prompt_json)
+
+        # Extract lists with defaults
+        greeting_list = data.get("Greetinglist", [])
+        features = data.get("Features", [])
+        blacklist = data.get("Blacklist", [])
+
+        # Return structured result
+        return {
+            "greeting_list": greeting_list,
+            "features": features,
+            "blacklist": blacklist
+        }
 
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
             detail=f"No JSON file found for person_type '{car.person_type}'"
         )
-    except KeyError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Missing expected key in JSON: {e}"
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid JSON content in '{car.person_type}.json': {e}"
-        )
     except Exception as e:
-        # Catch any other unexpected error
         raise HTTPException(
             status_code=500,
-            detail=f"Unexpected error loading JSON '{car.person_type}': {e}"
+            detail=f"Error loading JSON for '{car.person_type}': {e}"
         )
 
 @app.post("/create-json", status_code=201)
