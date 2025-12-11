@@ -32,10 +32,11 @@ PROMPT4_PATH = os.getenv("PROMPT4_PATH", "prompt4.txt")
 MESSTYPE_PATH = os.getenv("MESSTYPE_PATH", "messagetype.txt")
 
 
-JSONS_DIR = Path("jsons")
-JSONS_DIR.mkdir(exist_ok=True)
+# Use env var so Railway mount path can be configured; fallback to local "jsons" for dev.
+JSONS_DIR = Path(os.environ.get("JSONS_DIR", "jsons"))
+JSONS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Allow letters, numbers, hyphen, underscore, and dot (but we'll keep dot minimal)
+# Allow letters, numbers, hyphen, underscore, and dot
 FILENAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 class CreateJsonRequest(BaseModel):
@@ -44,17 +45,30 @@ class CreateJsonRequest(BaseModel):
 
 def sanitize_filename(name: str) -> str:
     """
-    Keep only safe characters. If name invalid after sanitization, raise ValueError.
-    This prevents '../' path traversal and weird chars.
+    Sanitize the filename to allow only safe characters.
+    If the name contains unsafe characters, replace them with underscores.
+    Trims leading/trailing dots, underscores, hyphens.
+    Limits length to 100 characters.
     """
     if not FILENAME_RE.match(name):
-        # attempt to normalize by removing illegal chars
         cleaned = re.sub(r"[^A-Za-z0-9_.-]", "_", name)
         cleaned = cleaned.strip("._-")
         if not cleaned:
             raise ValueError("Invalid file name after sanitization.")
-        return cleaned[:100]  # enforce max length
+        return cleaned[:100]
     return name
+
+def filepath_for(name: str) -> Path:
+    safe = sanitize_filename(name)
+    return JSONS_DIR / f"{safe}.json"
+
+def load_json(name: str) -> dict:
+    path = filepath_for(name)
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found")
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
 
 if not (AZURE_ENDPOINT and AZURE_API_KEY):
     # For safety: app will start but will reject requests if keys missing
@@ -198,30 +212,43 @@ async def generate_message(
 
 @app.post("/create-json", status_code=201)
 async def create_json(payload: CreateJsonRequest):
-    # sanitize
     try:
-        safe_name = sanitize_filename(payload.name)
+        path = filepath_for(payload.name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    filepath = JSONS_DIR / f"{safe_name}.json"
+    # Prevent accidental overwrite — change to allow overwrite if you want
+    if path.exists():
+        raise HTTPException(status_code=409, detail=f"File '{path.name}' already exists.")
 
-    # Option: refuse overwrite — change logic if you want to overwrite
-    if filepath.exists():
-        raise HTTPException(status_code=409, detail=f"File '{safe_name}.json' already exists.")
-
-    # write file safely
     try:
-        with filepath.open("w", encoding="utf-8") as f:
-            # Use ensure_ascii=False for proper UTF-8, indent for readability
+        # atomic-ish write: write to temp file then rename
+        tmp = path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
             json.dump(payload.proplist, f, ensure_ascii=False, indent=2)
+            f.flush()
+        tmp.replace(path)  # atomic on most platforms
     except Exception as e:
-        # remove partial file if created
-        if filepath.exists():
+        if path.exists():
             try:
-                filepath.unlink()
+                path.unlink()
             except Exception:
                 pass
         raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
 
-    return {"message": "created", "filename": str(filepath)}
+    return {"message": "created", "filename": str(path)}
+
+@app.get("/list-jsons")
+async def list_jsons():
+    files = [p.name for p in JSONS_DIR.glob("*.json")]
+    return {"files": files}
+
+@app.get("/read-json/{name}")
+async def read_json(name: str):
+    try:
+        data = load_json(name)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"name": name, "proplist": data}

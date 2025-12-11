@@ -1,7 +1,0 @@
-osmium tags-filter nordrhein-westfalen-251203.osm.pbf \
-  nwr/roof:solar=yes \
-  nwr/solar:panel=yes \
-  nwr/generator:source=solar \
-  nwr/generator:method=photovoltaic \
-  nwr/power=generator \
-  -o nrw_pv_only.osm.pbf
