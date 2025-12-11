@@ -188,9 +188,7 @@ async def generate_message(
             blacklist = prompt_json["proplist"].get("Blacklist", [])
 
             return {
-                "greeting_list": greeting_list,
-                "features": features,
-                "blacklist": blacklist
+                "type": car.person_type
             }
 
     except FileNotFoundError:
