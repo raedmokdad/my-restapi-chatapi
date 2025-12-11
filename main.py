@@ -59,10 +59,14 @@ def sanitize_filename(name: str) -> str:
     return name
 
 def filepath_for(name: str) -> Path:
+    """Get the full file path for a given JSON name after sanitization."""
     safe = sanitize_filename(name)
     return JSONS_DIR / f"{safe}.json"
 
 def load_json(name: str) -> dict:
+    """Load JSON file by name.
+    Raises FileNotFoundError if not found.
+    """
     path = filepath_for(name)
     if not path.exists():
         raise FileNotFoundError(f"{path} not found")
@@ -175,7 +179,25 @@ async def generate_message(
     prompt_template = PROMPT_TEMPLATES.get(car.person_type)
     if not prompt_template:
         raise HTTPException(status_code=400, detail=f"Unknown person_type '{car.person_type}'. Valid: {list(PROMPT_TEMPLATES.keys())}")
+    
+    try:
+            prompt_json = load_json(car.person_type)  # load_json uses JSONS_DIR
+            # Extract Greetinglist, Features, Blacklist
+            greeting_list = prompt_json["proplist"].get("Greetinglist", [])
+            features = prompt_json["proplist"].get("Features", [])
+            blacklist = prompt_json["proplist"].get("Blacklist", [])
 
+            return {
+                "greeting_list": greeting_list,
+                "features": features,
+                "blacklist": blacklist
+            }
+
+    except FileNotFoundError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No JSON file found for person_type '{car.person_type}'"
+            )
 
     # 2) prepare fields dictionary for replacement
     fields = {
