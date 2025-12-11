@@ -254,6 +254,7 @@ async def read_json(name: str):
         raise HTTPException(status_code=400, detail=str(e))
     return {"name": name, "proplist": data}
 
+@app.delete("/delete-json/{name}", status_code=200)
 async def delete_json(name: str = Path(..., description="Name of the JSON file to delete")):
     """
     Delete a JSON file by name.
