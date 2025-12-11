@@ -182,13 +182,10 @@ async def generate_message(
     
     try:
             prompt_json = load_json(car.person_type)  # load_json uses JSONS_DIR
-            # Extract Greetinglist, Features, Blacklist
-            greeting_list = prompt_json["proplist"].get("Greetinglist", [])
-            features = prompt_json["proplist"].get("Features", [])
-            blacklist = prompt_json["proplist"].get("Blacklist", [])
-
+    
             return {
-                "type": car.person_type
+                "type": car.person_type,
+                "prompt_json": prompt_json,
             }
 
     except FileNotFoundError:
