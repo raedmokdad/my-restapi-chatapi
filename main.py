@@ -194,43 +194,26 @@ async def generate_message(
             }
 
     except FileNotFoundError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"No JSON file found for person_type '{car.person_type}'"
-            )
-
-    # 2) prepare fields dictionary for replacement
-    fields = {
-        "seller": car.seller,
-        "marke": car.marke,
-        "modell": car.modell,
-        "ez": car.ez or "",
-        "getriebe": car.getriebe or "",
-        "fuel": car.fuel or "",
-        "km": car.km or "",
-        "aufbau": car.aufbau or "",
-        "preis": car.preis or "",
-        "beschreibung": car.beschreibung or "",
-        "telefon": car.telefon or "",
-        "buyer": car.buyer or "",
-        "preisvorschlag": "",
-    }
-
-    # 3) fill prompt and system
-    user_prompt = fill_placeholders(prompt_template, fields)
-    system_prompt = fill_placeholders(SYSTEM_TEMPLATE, fields) if SYSTEM_TEMPLATE else "You are a helpful assistant."
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-
-    # 4) call azure openai
-    assistant_content = await call_azure_chat(messages)
-
-    # 5) return result (raw assistant text)
-    return {"message": assistant_content}
-
+        raise HTTPException(
+            status_code=404,
+            detail=f"No JSON file found for person_type '{car.person_type}'"
+        )
+    except KeyError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing expected key in JSON: {e}"
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid JSON content in '{car.person_type}.json': {e}"
+        )
+    except Exception as e:
+        # Catch any other unexpected error
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error loading JSON '{car.person_type}': {e}"
+        )
 
 @app.post("/create-json", status_code=201)
 async def create_json(payload: CreateJsonRequest):
