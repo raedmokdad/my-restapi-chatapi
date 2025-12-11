@@ -5,13 +5,13 @@ import json
 import math
 from typing import Optional
 import httpx
-from fastapi import FastAPI, HTTPException
 from fastapi import Header
 import os
 from dotenv import load_dotenv 
 from pydantic import BaseModel, Field
 from typing import Any, Dict
 from pathlib import Path
+from fastapi import FastAPI, HTTPException, Path as FastAPIPath
 
 
 # Load environment variables from .env file if it exists
@@ -255,7 +255,7 @@ async def read_json(name: str):
     return {"name": name, "proplist": data}
 
 @app.delete("/delete-json/{name}", status_code=200)
-async def delete_json(name: str = Path(..., description="Name of the JSON file to delete")):
+async def delete_json(name: str = FastAPIPath(..., description="Name of the JSON file to delete")):
     """
     Delete a JSON file by name.
     """
