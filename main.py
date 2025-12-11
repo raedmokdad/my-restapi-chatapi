@@ -217,17 +217,13 @@ async def create_json(payload: CreateJsonRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Prevent accidental overwrite — change to allow overwrite if you want
-    if path.exists():
-        raise HTTPException(status_code=409, detail=f"File '{path.name}' already exists.")
-
     try:
         # atomic-ish write: write to temp file then rename
         tmp = path.with_suffix(".tmp")
         with tmp.open("w", encoding="utf-8") as f:
             json.dump(payload.proplist, f, ensure_ascii=False, indent=2)
             f.flush()
-        tmp.replace(path)  # atomic on most platforms
+        tmp.replace(path)  # overwrite existing file if exists
     except Exception as e:
         if path.exists():
             try:
@@ -236,7 +232,12 @@ async def create_json(payload: CreateJsonRequest):
                 pass
         raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
 
-    return {"message": "created", "filename": str(path)}
+    return {
+        "message": "created/updated",
+        "filename": str(path)
+    }
+
+
 
 @app.get("/list-jsons")
 async def list_jsons():
@@ -252,3 +253,22 @@ async def read_json(name: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"name": name, "proplist": data}
+
+async def delete_json(name: str = Path(..., description="Name of the JSON file to delete")):
+    """
+    Delete a JSON file by name.
+    """
+    try:
+        path = filepath_for(name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"File '{path.name}' not found.")
+
+    try:
+        path.unlink()  # delete the file
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {e}")
+
+    return {"message": "deleted", "filename": str(path)}
