@@ -111,6 +111,7 @@ class CarInfo(BaseModel):
     telefon: Optional[str] = ""
     buyer: Optional[str] = ""
     person_type: str  # "person1" or "person2" (decides which prompt to use)
+    max_tokens: Optional[int] = 40  # max tokens for response
 
 
 
@@ -192,12 +193,63 @@ async def generate_message(
         features = data.get("Features", [])
         blacklist = data.get("Blacklist", [])
 
-        # Return structured result
-        return {
-            "greeting_list": greeting_list,
-            "features": features,
-            "blacklist": blacklist
+         # 2) prepare fields dictionary for replacement
+        fields = {
+            "seller": car.seller,
+            "marke": car.marke,
+            "modell": car.modell,
+            "ez": car.ez or "",
+            "getriebe": car.getriebe or "",
+            "fuel": car.fuel or "",
+            "km": car.km or "",
+            "aufbau": car.aufbau or "",
+            "preis": car.preis or "",
+            "beschreibung": car.beschreibung or "",
+            "telefon": car.telefon or "",
+            "buyer": car.buyer or "",
+            "preisvorschlag": "",
         }
+
+        # --- Convert Features ---
+        filtered_features_dict = {key: fields.get(key, "") for key in features}
+        filtered_features = ", ".join(f"{k}={v}" for k, v in filtered_features_dict.items() if v)
+        # --- Convert Greetinglist ---
+        greeting_list_str = ", ".join(greeting_list)
+        black_list_str = ", ".join(blacklist)
+
+        # 3) fill prompt and system
+        prompt_parameters = {
+        "Greetinglist": greeting_list_str,
+        "Features": filtered_features,
+        "Blacklist": black_list_str,
+        "maxtoken": str(car.maxtoken),
+        "seller": car.seller,
+        "buyer": car.buyer,
+        "preis": car.preis or "",
+        }
+
+        # merge all placeholders
+        all_placeholders = {
+            **prompt_parameters,
+            **fields
+        }
+
+        # fill the prompt
+        user_prompt = fill_placeholders(prompt_template, all_placeholders)
+        system_prompt = fill_placeholders(SYSTEM_TEMPLATE, fields) if SYSTEM_TEMPLATE else "You are a helpful assistant."
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        # 4) call azure openai
+        assistant_content = await call_azure_chat(messages)
+
+        # 5) return result (raw assistant text)
+        return {"message": assistant_content}
+
+   
 
     except FileNotFoundError:
         raise HTTPException(
