@@ -223,15 +223,15 @@ async def generate_message(
         "Features": filtered_features,
         "Blacklist": black_list_str,
         "maxtoken": str(car.max_tokens),
-        "seller": car.seller,
-        "buyer": car.buyer,
+        "seller": car.seller or "",
+        "buyer": car.buyer or "",
         "preis": car.preis or "",
+        "preisvorschlag": ""
         }
 
         # merge all placeholders
         all_placeholders = {
-            **prompt_parameters,
-            **fields
+            **prompt_parameters
         }
 
         # fill the prompt
