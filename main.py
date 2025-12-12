@@ -287,6 +287,9 @@ async def generate_message(
         greeting_list_str = ", ".join(greeting_list)
         black_list_str = ", ".join(blacklist)
 
+        # Ensure price is a number (float) if it exists
+        preis_value = float(car.preis) if car.preis else None
+
         # 3) fill prompt and system
         prompt_parameters = {
         "Greetinglist": greeting_list_str,
@@ -295,7 +298,7 @@ async def generate_message(
         "maxtoken": str(car.max_tokens),
         "seller": car.seller or "",
         "buyer": car.buyer or "",
-        "preis": car.preis or "",
+        "preis": preis_value,
         "preisvorschlag": ""
         }
 
