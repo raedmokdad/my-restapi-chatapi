@@ -39,6 +39,7 @@ JSONS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Allow letters, numbers, hyphen, underscore, and dot
 FILENAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+MAX_ATTEMPTS = 3
 
 class CreateJsonRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Filename (without path)")
@@ -237,7 +238,29 @@ def validate_message(assistant_content: str, car, Greetinglist: List[str], neede
 
     return errors
 
+# helper to build the corrective prompt the model will receive
+def build_correction_prompt(original_message: str, validation_errors: list, greeting_list, features, blacklist, maxtoken: int, seller_name: str, preis_exists: bool):
+    errors_text = "\n".join(f"- {e}" for e in validation_errors)
+    # be explicit and prescriptive — ask the model to only return the corrected sentence
+    prompt = f"""You returned this single-sentence message which failed validation:
+ORIGINAL: {original_message}
 
+Validation errors:
+{errors_text}
+
+Correct the message so it follows ALL the hard rules:
+- Output EXACTLY one single sentence and nothing else.
+- Must not exceed {maxtoken} tokens.
+- Start with a greeting selected ONLY from {greeting_list} followed immediately by {seller_name} (no punctuation between greeting and name).
+- Include these features: {features} naturally in the same sentence.
+- Include a short personal reason for wanting the car.
+- Pricing: {'If a numeric price exists, calculate the offer and include it in euros (rounded) according to strategy. Do NOT ask the price.' if preis_exists else 'If no price exists, ask "what price were you thinking?" naturally.'}
+- DO NOT use any phrase from the blacklist: {blacklist}.
+- No sign-offs, no extra explanation, no newlines, no emojis.
+
+Return ONLY the corrected single sentence (no JSON, no commentary).
+"""
+    return prompt
 
 
 @app.post("/generate-message")
@@ -318,23 +341,56 @@ async def generate_message(
 
         # 4) call azure openai
         assistant_content = await call_azure_chat(messages, car.max_tokens)
-        # 5) validate response
-        validation_errors = validate_message(assistant_content, car, greeting_list, features, blacklist, car.max_tokens)
 
-        #6) return response or errors
+        # 5) validate and possibly correct in a loop
+        # attempt loop
+        attempt = 1
+        final_assistant_content = assistant_content  # initial model reply already produced earlier
+        validation_errors = validate_message(final_assistant_content, car, greeting_list, features, blacklist, car.max_tokens)
+
+        while validation_errors and attempt < MAX_ATTEMPTS:
+            # build corrective prompt that tells the model what to fix
+            seller_name = getattr(car, "seller", None) if not isinstance(car, dict) else car.get("seller", None)
+            preis_exists = bool(getattr(car, "preis", None) if not isinstance(car, dict) else car.get("preis", None))
+            correction_prompt = build_correction_prompt(
+                original_message=final_assistant_content,
+                validation_errors=validation_errors,
+                greeting_list=greeting_list,
+                features=features,
+                blacklist=blacklist,
+                maxtoken=car.max_tokens,
+                seller_name=seller_name,
+                preis_exists=preis_exists
+            )
+
+            # prepare minimal messages for the model — system + user correction prompt
+            correction_messages = [
+                {"role": "system", "content": "You are a strict assistant that must follow the hard rules exactly. Return only the corrected single sentence."},
+                {"role": "user", "content": correction_prompt}
+            ]
+
+            # ask the model to correct the message
+            final_assistant_content = await call_azure_chat(correction_messages, car.max_tokens)
+
+            # re-validate the returned sentence
+            validation_errors = validate_message(final_assistant_content, car, greeting_list, features, blacklist, car.max_tokens)
+            attempt += 1
+
+        # after attempts: either valid or fail
         if validation_errors:
+            # failed after retries — include final assistant content for debugging
             raise HTTPException(
                 status_code=422,
                 detail={
-                        "validation_errors": validation_errors,
-                        "assistant_content": assistant_content  # <-- include the content here
+                    "validation_errors": validation_errors,
+                    "assistant_content": final_assistant_content,
+                    "attempts": attempt - 1
                 }
             )
-        else:
-            return {"message": assistant_content}
 
-   
-
+        # success: return validated message
+        return {"message": final_assistant_content}
+    
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
