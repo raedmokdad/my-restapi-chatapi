@@ -188,7 +188,7 @@ def validate_message(assistant_content: str, car, Greetinglist: List[str], neede
     second_word = assistant_content.split()[1] if len(assistant_content.split()) > 1 else ""
     seller_name = get_attr(car, "seller", "")
     if first_word not in Greetinglist or second_word != seller_name:
-        errors.append(f"Message does not start with proper greeting and name ('{first_word} {second_word} {seller_name}')")
+        errors.append(f"Message does not start with proper greeting and name (' first_word={first_word} second_word={second_word} seller_name={seller_name}')")
 
     # 3. Feature check: needed features mentioned
     for feature in needed_features:
