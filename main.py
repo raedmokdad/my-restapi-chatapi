@@ -228,7 +228,7 @@ def validate_message(assistant_content: str, car, Greetinglist: List[str], neede
 
         # Check if expected offer appears in the assistant content
         if expected_offer and str(round(expected_offer)) not in assistant_content:
-            errors.append("Price strategy not applied correctly")
+            errors.append(f"Price strategy not applied correctly (expected offer: {round(expected_offer)})")
 
     # 5. Blacklist filter
     for phrase in forbidden_phrases:
