@@ -263,6 +263,16 @@ Return ONLY the corrected single sentence (no JSON, no commentary).
     return prompt
 
 
+def normalize_prices_in_text(text: str) -> str:
+    """Normalize prices in text by removing formatting like commas, dots, spaces.
+    E.g. "1,200.50" -> "1200.50"
+    
+    """
+    def repl(match):
+        number = match.group(0)
+        return re.sub(r"[.,\s]", "", number)  # remove commas, dots, spaces
+    return re.sub(r"\d[\d.,\s]*\d", repl, text)
+
 @app.post("/generate-message")
 async def generate_message(
     car: CarInfo,
@@ -345,7 +355,7 @@ async def generate_message(
         # 5) validate and possibly correct in a loop
         # attempt loop
         attempt = 1
-        final_assistant_content = assistant_content  # initial model reply already produced earlier
+        final_assistant_content = normalize_prices_in_text(assistant_content)
         validation_errors = validate_message(final_assistant_content, car, greeting_list, features, blacklist, car.max_tokens)
 
         while validation_errors and attempt < MAX_ATTEMPTS:
@@ -371,6 +381,9 @@ async def generate_message(
 
             # ask the model to correct the message
             final_assistant_content = await call_azure_chat(correction_messages, car.max_tokens)
+
+            # normalize prices in the returned text
+            final_assistant_content = normalize_prices_in_text(final_assistant_content)
 
             # re-validate the returned sentence
             validation_errors = validate_message(final_assistant_content, car, greeting_list, features, blacklist, car.max_tokens)
