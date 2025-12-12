@@ -135,7 +135,7 @@ def fill_placeholders(template: str, fields: dict) -> str:
     return filled
 
 
-async def call_azure_chat(messages: list) -> str:
+async def call_azure_chat(messages: list, max_tokens: int) -> str:
     """
     Calls the Azure OpenAI chat/completions endpoint (synchronous via async httpx).
     Returns assistant message content.
@@ -153,7 +153,7 @@ async def call_azure_chat(messages: list) -> str:
         "messages": messages,
         # you can expose temperature/max_tokens via env or keep fixed:
         "temperature": 0.3,
-        "max_tokens": 40,
+        "max_tokens": max_tokens,
         "frequency_penalty": 0.2,   
     }
 
@@ -222,7 +222,7 @@ async def generate_message(
         "Greetinglist": greeting_list_str,
         "Features": filtered_features,
         "Blacklist": black_list_str,
-        "maxtoken": str(car.maxtoken),
+        "maxtoken": str(car.max_tokens),
         "seller": car.seller,
         "buyer": car.buyer,
         "preis": car.preis or "",
@@ -244,7 +244,7 @@ async def generate_message(
         ]
 
         # 4) call azure openai
-        assistant_content = await call_azure_chat(messages)
+        assistant_content = await call_azure_chat(messages, car.max_tokens)
 
         # 5) return result (raw assistant text)
         return {"message": assistant_content}
