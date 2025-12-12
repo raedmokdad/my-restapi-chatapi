@@ -169,8 +169,14 @@ async def call_azure_chat(messages: list, max_tokens: int) -> str:
         except Exception:
             raise HTTPException(status_code=502, detail=f"Unexpected Azure response format: {j}")
 
+def get_attr(obj, attr, default=None):
+    """Helper to get attribute or dict key safely."""
+    if isinstance(obj, dict):
+        return obj.get(attr, default)
+    return getattr(obj, attr, default)
 
-def validate_message(assistant_content: str, car: Dict, Greetinglist: List[str], needed_features: List[str], forbidden_phrases: List[str], max_tokens: Optional[int] = None) -> List[str]:
+
+def validate_message(assistant_content: str, car, Greetinglist: List[str], needed_features: List[str], forbidden_phrases: List[str], max_tokens: Optional[int] = None) -> List[str]:
     errors = []
 
     # 1. Length validation
@@ -180,16 +186,18 @@ def validate_message(assistant_content: str, car: Dict, Greetinglist: List[str],
     # 2. Format-check: starts with Greeting + Name
     first_word = assistant_content.split()[0] if assistant_content else ""
     second_word = assistant_content.split()[1] if len(assistant_content.split()) > 1 else ""
-    if first_word not in Greetinglist or second_word != car.get("seller", ""):
+    seller_name = get_attr(car, "seller", "")
+    if first_word not in Greetinglist or second_word != seller_name:
         errors.append("Message does not start with proper greeting and name")
 
     # 3. Feature check: needed features mentioned
     for feature in needed_features:
-        if str(car.get(feature, "")).lower() not in assistant_content.lower():
+        feature_value = str(get_attr(car, feature, "")).lower()
+        if feature_value not in assistant_content.lower():
             errors.append(f"{feature.capitalize()} not mentioned in message")
 
     # 4. Price logic check (example strategy)
-    price = car.get("preis")
+    price = get_attr(car, "preis", None)
     if price:
         price = float(price)
         # Example: price <1000 -> double; 1000-3000 +50%, etc.
