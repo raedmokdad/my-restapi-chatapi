@@ -3,7 +3,7 @@ import os
 import re
 import json
 import math
-from typing import Optional
+from typing import List, Optional
 import httpx
 from fastapi import Header
 import os
@@ -170,6 +170,53 @@ async def call_azure_chat(messages: list, max_tokens: int) -> str:
             raise HTTPException(status_code=502, detail=f"Unexpected Azure response format: {j}")
 
 
+def validate_message(assistant_content: str, car: Dict, Greetinglist: List[str], needed_features: List[str], forbidden_phrases: List[str], max_tokens: Optional[int] = None) -> List[str]:
+    errors = []
+
+    # 1. Length validation
+    if max_tokens is not None and len(assistant_content.split()) > max_tokens:
+        errors.append("Message is too long to max_tokens")
+
+    # 2. Format-check: starts with Greeting + Name
+    first_word = assistant_content.split()[0] if assistant_content else ""
+    second_word = assistant_content.split()[1] if len(assistant_content.split()) > 1 else ""
+    if first_word not in Greetinglist or second_word != car.get("seller", ""):
+        errors.append("Message does not start with proper greeting and name")
+
+    # 3. Feature check: needed features mentioned
+    for feature in needed_features:
+        if str(car.get(feature, "")).lower() not in assistant_content.lower():
+            errors.append(f"{feature.capitalize()} not mentioned in message")
+
+    # 4. Price logic check (example strategy)
+    price = car.get("preis")
+    if price:
+        price = float(price)
+        # Example: price <1000 -> double; 1000-3000 +50%, etc.
+        expected_offer = None
+        if price < 1000:
+            expected_offer = price * 2
+        elif 1000 <= price <= 3000:
+            expected_offer = price * 1.5
+        elif 3000 < price <= 10000:
+            expected_offer = price * 1.2
+        elif price > 10000:
+            expected_offer = price * 1.1
+
+        # Check if expected offer appears in the assistant content
+        if expected_offer and str(round(expected_offer)) not in assistant_content:
+            errors.append("Price strategy not applied correctly")
+
+    # 5. Blacklist filter
+    for phrase in forbidden_phrases:
+        if phrase.lower() in assistant_content.lower():
+            errors.append(f"Forbidden phrase used: '{phrase}'")
+
+    return errors
+
+
+
+
 @app.post("/generate-message")
 async def generate_message(
     car: CarInfo,
@@ -245,9 +292,17 @@ async def generate_message(
 
         # 4) call azure openai
         assistant_content = await call_azure_chat(messages, car.max_tokens)
+        # 5) validate response
+        validation_errors = validate_message(assistant_content, car, greeting_list, features, blacklist, car.max_tokens)
 
-        # 5) return result (raw assistant text)
-        return {"message": assistant_content}
+        #6) return response or errors
+        if validation_errors:
+            raise HTTPException(
+                status_code=422,
+                detail={"validation_errors": validation_errors}
+            )
+        else:
+            return {"message": assistant_content}
 
    
 
