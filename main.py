@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Path as FastAPIPath
+import string
 
 
 # Load environment variables from .env file if it exists
@@ -175,8 +176,22 @@ def get_attr(obj, attr, default=None):
         return obj.get(attr, default)
     return getattr(obj, attr, default)
 
+def clean_word(word):
+    """Remove punctuation from start and end of a word."""
+    return word.strip(string.punctuation)
 
 def validate_message(assistant_content: str, car, Greetinglist: List[str], needed_features: List[str], forbidden_phrases: List[str], max_tokens: Optional[int] = None) -> List[str]:
+    
+    """Validate the assistant message content.
+    Returns a list of error messages. Empty list means validation passed.
+    Validation checks:
+    1. Length validation: message should not exceed max_tokens (if provided).
+    2. Format-check: message starts with a greeting from Greetinglist followed by seller's name.
+    3. Feature check: all needed_features are mentioned in the message.
+    4. Price logic check: price strategy applied correctly.
+    5. Blacklist filter: no forbidden phrases used.
+    """
+    
     errors = []
 
     # 1. Length validation
@@ -184,11 +199,11 @@ def validate_message(assistant_content: str, car, Greetinglist: List[str], neede
         errors.append("Message is too long to max_tokens")
 
     # 2. Format-check: starts with Greeting + Name
-    first_word = assistant_content.split()[0] if assistant_content else ""
-    second_word = assistant_content.split()[1] if len(assistant_content.split()) > 1 else ""
+    first_word = clean_word(assistant_content.split()[0]) if assistant_content else ""
+    second_word = clean_word(assistant_content.split()[1]) if len(assistant_content.split()) > 1 else ""
     seller_name = get_attr(car, "seller", "")
     if first_word not in Greetinglist or second_word != seller_name:
-        errors.append(f"Message does not start with proper greeting and name (' first_word={first_word} second_word={second_word} seller_name={seller_name}')")
+        errors.append(f"Message does not start with proper greeting and name ('first_word={first_word}' second_word={second_word} seller_name={seller_name}')")
 
     # 3. Feature check: needed features mentioned
     for feature in needed_features:
