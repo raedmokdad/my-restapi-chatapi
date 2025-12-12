@@ -307,7 +307,8 @@ async def generate_message(
         if validation_errors:
             raise HTTPException(
                 status_code=422,
-                detail={"validation_errors": validation_errors}
+                detail={"validation_errors": validation_errors},
+                assistant_content= {"message": assistant_content}
             )
         else:
             return {"message": assistant_content}
