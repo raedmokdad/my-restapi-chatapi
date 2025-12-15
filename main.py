@@ -466,7 +466,7 @@ async def upload_prompt_file(
         raise HTTPException(status_code=400, detail="Only .txt files are allowed")
 
     prompt_name = name or Path(file.filename).stem
-    path = PROMPTS_DIR / f"{prompt_name}.txt"
+    path = JSONS_DIR / f"{prompt_name}.txt"
 
     try:
         content = (await file.read()).decode("utf-8")
@@ -476,7 +476,7 @@ async def upload_prompt_file(
             mode="w",
             encoding="utf-8",
             delete=False,
-            dir=PROMPTS_DIR
+            dir=JSONS_DIR
         ) as tmp:
             tmp.write(content)
             tmp_path = Path(tmp.name)
@@ -553,7 +553,7 @@ async def delete_prompt(filename: str):
     if not filename.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Only .txt files can be deleted.")
     
-    file_path = os.path.join(PROMPTS_DIR, filename)
+    file_path = os.path.join(JSONS_DIR, filename)
     
     # Check if file exists
     if not os.path.isfile(file_path):
