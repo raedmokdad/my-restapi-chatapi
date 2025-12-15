@@ -96,7 +96,7 @@ def load_prompt(prompt_name: str) -> str | None:
     Returns:
         The content of the prompt as a string, or None if file doesn't exist.
     """
-    file_path = JSONS_DIR / f"{prompt_name}.txt"
+    file_path = os.path.join(JSONS_DIR, f"{prompt_name}.txt")
     
     if not file_path.exists():
         print(f"Prompt '{prompt_name}' not found.")
