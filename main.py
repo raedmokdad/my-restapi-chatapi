@@ -13,6 +13,7 @@ from typing import Any, Dict
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Path as FastAPIPath
 import string
+import tempfile
 
 
 # Load environment variables from .env file if it exists
@@ -37,6 +38,10 @@ MESSTYPE_PATH = os.getenv("MESSTYPE_PATH", "messagetype.txt")
 JSONS_DIR = Path(os.environ.get("JSONS_DIR", "jsons"))
 JSONS_DIR.mkdir(parents=True, exist_ok=True)
 
+
+PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", "prompts"))
+PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
+
 # Allow letters, numbers, hyphen, underscore, and dot
 FILENAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 MAX_ATTEMPTS = 3
@@ -44,6 +49,11 @@ MAX_ATTEMPTS = 3
 class CreateJsonRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Filename (without path)")
     proplist: Dict[str, Any] = Field(..., description="Arbitrary JSON object to store")
+
+
+class UploadPromptRequest(BaseModel):
+    name: str
+    content: str
 
 def sanitize_filename(name: str) -> str:
     """
@@ -445,12 +455,59 @@ async def create_json(payload: CreateJsonRequest):
         "filename": str(path)
     }
 
+@app.post("/prompts/upload")
+async def upload_prompt(
+    payload: UploadPromptRequest
+):
+    
+    filename = f"{payload.name}.txt"
+    path = PROMPTS_DIR / filename
+
+    try:
+        # atomic write: write temp → replace
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            delete=False,
+            dir=PROMPTS_DIR
+        ) as tmp:
+            tmp.write(payload.content)
+            tmp_path = Path(tmp.name)
+
+        os.replace(tmp_path, path)  # overwrite if exists
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save prompt: {e}")
+
+    return {
+        "message": "Prompt created/updated successfully",
+        "filename": filename
+    }
+
 
 
 @app.get("/list-jsons")
 async def list_jsons():
     files = [p.name for p in JSONS_DIR.glob("*.json")]
     return {"files": files}
+
+
+@app.get("/prompts")
+async def list_prompts():
+    if not PROMPTS_DIR.exists():
+        return {"prompts": []}
+
+    prompts = [
+        p.stem
+        for p in PROMPTS_DIR.iterdir()
+        if p.is_file() and p.suffix == ".txt"
+    ]
+
+    return {
+        "count": len(prompts),
+        "prompts": sorted(prompts)
+    }
+
 
 @app.get("/read-json/{name}")
 async def read_json(name: str):
