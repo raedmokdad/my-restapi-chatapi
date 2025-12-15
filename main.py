@@ -316,7 +316,7 @@ async def generate_message(
 ):
     await verify_password(password)
     # 1) choose template
-    prompt_template = PROMPT_TEMPLATES.get(car.person_type)
+    prompt_template = load_prompt(car.person_type) # PROMPT_TEMPLATES.get(car.person_type)
     if not prompt_template:
         raise HTTPException(status_code=400, detail=f"Unknown person_type '{car.person_type}'. Valid: {list(PROMPT_TEMPLATES.keys())}")
     
