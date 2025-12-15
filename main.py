@@ -85,6 +85,31 @@ def load_json(name: str) -> dict:
         raise FileNotFoundError(f"{path} not found")
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
+    
+def load_prompt(prompt_name: str) -> str | None:
+    """
+    Load the content of a prompt text file by name.
+    
+    Args:
+        prompt_name: Name of the prompt (without .txt)
+    
+    Returns:
+        The content of the prompt as a string, or None if file doesn't exist.
+    """
+    file_path = JSONS_DIR / f"{prompt_name}.txt"
+    
+    if not file_path.exists():
+        print(f"Prompt '{prompt_name}' not found.")
+        return None
+    
+    try:
+        with file_path.open("r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        print(f"Error reading prompt '{prompt_name}': {e}")
+        return None    
+
+
 
 
 if not (AZURE_ENDPOINT and AZURE_API_KEY):
@@ -291,7 +316,7 @@ async def generate_message(
 ):
     await verify_password(password)
     # 1) choose template
-    prompt_template = PROMPT_TEMPLATES.get(car.person_type)
+    prompt_template = load_prompt(car.person_type)
     if not prompt_template:
         raise HTTPException(status_code=400, detail=f"Unknown person_type '{car.person_type}'. Valid: {list(PROMPT_TEMPLATES.keys())}")
     
