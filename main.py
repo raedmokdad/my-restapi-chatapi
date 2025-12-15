@@ -295,6 +295,7 @@ async def generate_message(
         greeting_list = data.get("Greetinglist", [])
         features = data.get("Features", [])
         blacklist = data.get("Blacklist", [])
+        examples= data.get("Examples", [])
 
          # 2) prepare fields dictionary for replacement
         fields = {
@@ -319,6 +320,7 @@ async def generate_message(
         # --- Convert Greetinglist ---
         greeting_list_str = ", ".join(greeting_list)
         black_list_str = ", ".join(blacklist)
+        examples_list_str=  ", ".join(examples)
 
         # Ensure price is a number (float) if it exists
         preis_value = float(car.preis) if car.preis else None
@@ -332,7 +334,8 @@ async def generate_message(
         "seller": car.seller or "",
         "buyer": car.buyer or "",
         "preis": preis_value,
-        "preisvorschlag": ""
+        "preisvorschlag": "",
+        "Examples": examples_list_str
         }
 
         # merge all placeholders
