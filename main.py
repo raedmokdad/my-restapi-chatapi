@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Path as FastAPIPath
+from fastapi import UploadFile, File, HTTPException, Header
 import string
 import tempfile
 
@@ -455,33 +456,39 @@ async def create_json(payload: CreateJsonRequest):
         "filename": str(path)
     }
 
-@app.post("/prompts/upload")
-async def upload_prompt(
-    payload: UploadPromptRequest
+@app.post("/prompts/upload-file")
+async def upload_prompt_file(
+    file: UploadFile = File(...),
+    name: str | None = None
 ):
     
-    filename = f"{payload.name}.txt"
-    path = PROMPTS_DIR / filename
+    if not file.filename.endswith(".txt"):
+        raise HTTPException(status_code=400, detail="Only .txt files are allowed")
+
+    prompt_name = name or Path(file.filename).stem
+    path = PROMPTS_DIR / f"{prompt_name}.txt"
 
     try:
-        # atomic write: write temp → replace
+        content = (await file.read()).decode("utf-8")
+
+        # atomic overwrite
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
             delete=False,
             dir=PROMPTS_DIR
         ) as tmp:
-            tmp.write(payload.content)
+            tmp.write(content)
             tmp_path = Path(tmp.name)
 
-        os.replace(tmp_path, path)  # overwrite if exists
+        os.replace(tmp_path, path)
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save prompt: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload prompt: {e}")
 
     return {
-        "message": "Prompt created/updated successfully",
-        "filename": filename
+        "message": "Prompt uploaded successfully",
+        "prompt": prompt_name
     }
 
 
