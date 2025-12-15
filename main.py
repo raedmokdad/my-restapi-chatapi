@@ -501,12 +501,12 @@ async def list_jsons():
 
 @app.get("/prompts")
 async def list_prompts():
-    if not PROMPTS_DIR.exists():
+    if not JSONS_DIR.exists():
         return {"prompts": []}
 
     prompts = [
         p.stem
-        for p in PROMPTS_DIR.iterdir()
+        for p in JSONS_DIR.iterdir()
         if p.is_file() and p.suffix == ".txt"
     ]
 
