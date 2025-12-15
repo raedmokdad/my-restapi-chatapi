@@ -76,6 +76,7 @@ def filepath_for(name: str) -> Path:
     safe = sanitize_filename(name)
     return JSONS_DIR / f"{safe}.json"
 
+
 def load_json(name: str) -> dict:
     """Load JSON file by name.
     Raises FileNotFoundError if not found.
@@ -590,3 +591,43 @@ async def delete_prompt(filename: str):
         return {"message": f"{filename} deleted successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
+
+
+@app.post("/upload-json", status_code=201)
+async def upload_json(payload: CreateJsonRequest):
+    path = filepath_for(payload.name)
+
+    # Load existing data if the file exists
+    if path.exists():
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                existing_data = json.load(f)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to read existing JSON: {e}")
+    else:
+        existing_data = {}
+
+    # Merge existing data with new payload
+    merged_data = {**existing_data, **payload.proplist}
+
+    # Check if anything actually changed
+    if merged_data == existing_data:
+        return {
+            "message": "No changes detected, file not updated",
+            "filename": str(path)
+        }
+
+    # Atomic-ish write
+    try:
+        tmp = path.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            json.dump(merged_data, f, ensure_ascii=False, indent=2)
+            f.flush()
+        tmp.replace(path)  # overwrite safely
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write JSON: {e}")
+
+    return {
+        "message": "JSON uploaded/updated successfully",
+        "filename": str(path)
+    }
