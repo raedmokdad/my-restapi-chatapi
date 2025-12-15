@@ -545,3 +545,23 @@ async def delete_json(name: str = FastAPIPath(..., description="Name of the JSON
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {e}")
 
     return {"message": "deleted", "filename": str(path)}
+
+
+@app.delete("/prompts/delete/{filename}")
+async def delete_prompt(filename: str):
+    # Ensure filename ends with .txt
+    if not filename.endswith(".txt"):
+        raise HTTPException(status_code=400, detail="Only .txt files can be deleted.")
+    
+    file_path = os.path.join(PROMPTS_DIR, filename)
+    
+    # Check if file exists
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="File not found.")
+    
+    # Delete the file
+    try:
+        os.remove(file_path)
+        return {"message": f"{filename} deleted successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
