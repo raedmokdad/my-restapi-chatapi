@@ -599,7 +599,7 @@ async def delete_json(name: str = FastAPIPath(..., description="Name of the JSON
     Delete a JSON file by name.
     """
     try:
-        path = os.path.join(JSONS_DIR, name)
+        path = filepath_for(name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
