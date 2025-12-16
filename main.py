@@ -397,7 +397,7 @@ async def generate_message(
         final_assistant_content = normalize_prices_in_text(assistant_content)
         validation_errors = validate_message(final_assistant_content, car, greeting_list, features, blacklist, car.max_tokens)
 
-        while validation_errors and attempt < MAX_ATTEMPTS:
+        while validation_errors and attempt <= MAX_ATTEMPTS:
             # build corrective prompt that tells the model what to fix
             seller_name = getattr(car, "seller", None) if not isinstance(car, dict) else car.get("seller", None)
             preis_exists = bool(getattr(car, "preis", None) if not isinstance(car, dict) else car.get("preis", None))
