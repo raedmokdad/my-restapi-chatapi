@@ -293,12 +293,6 @@ def normalize_prices_in_text(text: str) -> str:
         return re.sub(r"[.,\s]", "", number)  # remove commas, dots, spaces
     return re.sub(r"\d[\d.,\s]*\d", repl, text)
 
-def normalize_filename(name: str) -> str:
-    """Normalize filename by stripping whitespace and replacing unsafe characters."""
-    name = name.strip()
-    name = re.sub(r"[^\w\-\.]", "_", name)
-    return name
-
 @app.post("/generate-message")
 async def generate_message(
     car: CarInfo,
@@ -717,10 +711,7 @@ async def delete_json(name: str = FastAPIPath(..., description="Name of the JSON
     Delete a JSON file by name.
     """
     try:
-
-        safe_name = normalize_filename(name)
-        path = filepath_for(safe_name)
-        
+        path = filepath_for(name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -756,3 +747,19 @@ async def delete_prompt(filename: str):
         return {"message": f"{filename} deleted successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
+    
+
+    
+@app.delete("/admin/clear-volume")
+async def clear_volume():
+    deleted = 0
+
+    for item in JSONS_DIR.iterdir():
+        if item.is_file():
+            item.unlink()
+            deleted += 1
+
+    return {
+        "message": "Volume cleared",
+        "files_deleted": deleted
+    }
