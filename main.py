@@ -40,10 +40,6 @@ MESSTYPE_PATH = os.getenv("MESSTYPE_PATH", "messagetype.txt")
 JSONS_DIR = Path(os.environ.get("JSONS_DIR", "jsons"))
 JSONS_DIR.mkdir(parents=True, exist_ok=True)
 
-
-PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", "prompts"))
-PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
-
 # Allow letters, numbers, hyphen, underscore, and dot
 FILENAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 MAX_ATTEMPTS = 3
@@ -657,8 +653,10 @@ def download_json(filename: str):
 
 @app.get("/prompts/download/{prompt_name}")
 def download_prompt(prompt_name: str):
-    filename = f"{prompt_name}.txt"
-    file_path = PROMPTS_DIR / filename
+    if not prompt_name.endswith(".txt"):
+        raise HTTPException(status_code=400, detail="Invalid file type")
+    
+    file_path = JSONS_DIR / prompt_name
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Prompt not found")
@@ -666,5 +664,5 @@ def download_prompt(prompt_name: str):
     return FileResponse(
         path=file_path,
         media_type="text/plain",
-        filename=filename
+        filename=prompt_name
     )
