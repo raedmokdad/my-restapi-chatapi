@@ -653,3 +653,18 @@ def download_json(filename: str):
         media_type="application/json",
         filename=filename
     )
+
+
+@app.get("/prompts/download/{prompt_name}")
+def download_prompt(prompt_name: str):
+    filename = f"{prompt_name}.txt"
+    file_path = PROMPTS_DIR / filename
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    return FileResponse(
+        path=file_path,
+        media_type="text/plain",
+        filename=filename
+    )
