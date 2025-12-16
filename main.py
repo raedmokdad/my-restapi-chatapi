@@ -452,30 +452,74 @@ async def generate_message(
             detail=f"Error loading JSON for '{car.person_type}': {e}"
         )
 
-@app.post("/create-json", status_code=201)
-async def create_json(payload: CreateJsonRequest):
-    try:
-        path = filepath_for(payload.name)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# @app.post("/create-json", status_code=201)
+# async def create_json(payload: CreateJsonRequest):
+#     try:
+#         path = filepath_for(payload.name)
+#     except ValueError as e:
+#         raise HTTPException(status_code=400, detail=str(e))
+
+#     try:
+#         # atomic-ish write: write to temp file then rename
+#         tmp = path.with_suffix(".tmp")
+#         with tmp.open("w", encoding="utf-8") as f:
+#             json.dump(payload.proplist, f, ensure_ascii=False, indent=2)
+#             f.flush()
+#         tmp.replace(path)  # overwrite existing file if exists
+#     except Exception as e:
+#         if path.exists():
+#             try:
+#                 path.unlink()
+#             except Exception:
+#                 pass
+#         raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
+
+#     return {
+#         "message": "created/updated",
+#         "filename": str(path)
+#     }
+
+@app.post("/upload-json-file")
+async def upload_json_file(file: UploadFile = File(...)):
+    if not file.filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="Only .json files are allowed")
+    
+    path = JSONS_DIR / file.filename
 
     try:
-        # atomic-ish write: write to temp file then rename
-        tmp = path.with_suffix(".tmp")
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(payload.proplist, f, ensure_ascii=False, indent=2)
-            f.flush()
-        tmp.replace(path)  # overwrite existing file if exists
+        # read file content
+        content_bytes = await file.read()
+        content_str = content_bytes.decode("utf-8")
+        
+        # validate JSON
+        content = json.loads(content_str)
+
+        # atomic overwrite
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                delete=False,
+                dir=JSONS_DIR
+            ) as tmp:
+                json.dump(content, tmp, ensure_ascii=False, indent=2)
+                tmp_path = Path(tmp.name)
+            
+            # overwrite existing file
+            os.replace(tmp_path, path)
+        finally:
+            # cleanup temp file if something goes wrong
+            if tmp_path and tmp_path.exists():
+                tmp_path.unlink()
+                
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Uploaded file is not valid JSON")
     except Exception as e:
-        if path.exists():
-            try:
-                path.unlink()
-            except Exception:
-                pass
-        raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload JSON file: {e}")
 
     return {
-        "message": "created/updated",
+        "message": "JSON file uploaded successfully (created or updated)",
         "filename": str(path)
     }
 
@@ -589,50 +633,6 @@ async def delete_prompt(filename: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
 
-
-@app.post("/upload-json-file")
-async def upload_json_file(file: UploadFile = File(...)):
-    if not file.filename.endswith(".json"):
-        raise HTTPException(status_code=400, detail="Only .json files are allowed")
-    
-    path = JSONS_DIR / file.filename
-
-    try:
-        # read file content
-        content_bytes = await file.read()
-        content_str = content_bytes.decode("utf-8")
-        
-        # validate JSON
-        content = json.loads(content_str)
-
-        # atomic overwrite
-        tmp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                delete=False,
-                dir=JSONS_DIR
-            ) as tmp:
-                json.dump(content, tmp, ensure_ascii=False, indent=2)
-                tmp_path = Path(tmp.name)
-            
-            # overwrite existing file
-            os.replace(tmp_path, path)
-        finally:
-            # cleanup temp file if something goes wrong
-            if tmp_path and tmp_path.exists():
-                tmp_path.unlink()
-                
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Uploaded file is not valid JSON")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload JSON file: {e}")
-
-    return {
-        "message": "JSON file uploaded successfully (created or updated)",
-        "filename": str(path)
-    }
 
 @app.get("/download-json/{filename}")
 def download_json(filename: str):
