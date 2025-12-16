@@ -559,6 +559,37 @@ async def upload_prompt_file(
         "prompt": prompt_name
     }
 
+@app.post("/prompts/upload-system-file")
+async def upload_prompt_file(file: UploadFile = File(...)):
+    # Only allow a file named 'messagetype.txt'
+    if file.filename != "messagetype.txt":
+        raise HTTPException(status_code=400, detail="Only 'messagetype.txt' is allowed")
+
+    path = JSONS_DIR / "messagetype.txt"
+
+    try:
+        content = (await file.read()).decode("utf-8")
+
+        # atomic overwrite
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            delete=False,
+            dir=JSONS_DIR
+        ) as tmp:
+            tmp.write(content)
+            tmp_path = Path(tmp.name)
+
+        os.replace(tmp_path, path)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload prompt: {e}")
+
+    return {
+        "message": "Prompt uploaded successfully",
+        "prompt": "messagetype"
+    }
+
 
 
 @app.get("/list-jsons")
@@ -607,6 +638,39 @@ async def view_prompt(name: str):
     content = file_path.read_text(encoding="utf-8")
     return {"name": name, "content": content}
 
+@app.get("/download-json/{filename}")
+def download_json(filename: str):
+    if not filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    file_path = JSONS_DIR / filename
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        path=file_path,
+        media_type="application/json",
+        filename=filename
+    )
+
+
+@app.get("/prompts/download/{prompt_name}")
+def download_prompt(prompt_name: str):
+    if not prompt_name.endswith(".txt"):
+        raise HTTPException(status_code=400, detail="Invalid file type")
+    
+    file_path = JSONS_DIR / prompt_name
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    return FileResponse(
+        path=file_path,
+        media_type="text/plain",
+        filename=prompt_name
+    )
+
 @app.delete("/delete-json/{name}", status_code=200)
 async def delete_json(name: str = FastAPIPath(..., description="Name of the JSON file to delete")):
     """
@@ -646,37 +710,3 @@ async def delete_prompt(filename: str):
         return {"message": f"{filename} deleted successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
-
-
-@app.get("/download-json/{filename}")
-def download_json(filename: str):
-    if not filename.endswith(".json"):
-        raise HTTPException(status_code=400, detail="Invalid file type")
-
-    file_path = JSONS_DIR / filename
-
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-
-    return FileResponse(
-        path=file_path,
-        media_type="application/json",
-        filename=filename
-    )
-
-
-@app.get("/prompts/download/{prompt_name}")
-def download_prompt(prompt_name: str):
-    if not prompt_name.endswith(".txt"):
-        raise HTTPException(status_code=400, detail="Invalid file type")
-    
-    file_path = JSONS_DIR / prompt_name
-
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Prompt not found")
-
-    return FileResponse(
-        path=file_path,
-        media_type="text/plain",
-        filename=prompt_name
-    )
