@@ -125,14 +125,6 @@ def _load_file(path: str) -> str:
     except FileNotFoundError:
         return ""
 
-PROMPT_TEMPLATES = {
-    "person1": _load_file(PROMPT1_PATH),
-    "person2": _load_file(PROMPT2_PATH),
-    "person3": _load_file(PROMPT3_PATH),
-    "person4": _load_file(PROMPT4_PATH),
-}
-SYSTEM_TEMPLATE = _load_file(MESSTYPE_PATH)
-
 
 class CarInfo(BaseModel):
     seller: str
@@ -316,8 +308,13 @@ async def generate_message(
     await verify_password(password)
     # 1) choose template
     prompt_template = load_prompt(car.person_type) # PROMPT_TEMPLATES.get(car.person_type)
+    SYSTEM_TEMPLATE = load_prompt("messagetype")
+
     if not prompt_template:
         raise HTTPException(status_code=400, detail=f"Unknown person_type '{car.person_type}'.")
+    
+    if not SYSTEM_TEMPLATE:
+        raise HTTPException(status_code=400, detail=f"Unknown system prompt.")
     
     try:
         # Load JSON from volume
