@@ -594,6 +594,19 @@ async def read_json(name: str):
         raise HTTPException(status_code=400, detail=str(e))
     return {"name": name, "proplist": data}
 
+@app.get("/prompts/{name}")
+async def view_prompt(name: str):
+    """
+    Get the content of a prompt by name (without .txt extension)
+    """
+    file_path = JSONS_DIR / f"{name}.txt"
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Prompt '{name}' not found")
+    
+    content = file_path.read_text(encoding="utf-8")
+    return {"name": name, "content": content}
+
 @app.delete("/delete-json/{name}", status_code=200)
 async def delete_json(name: str = FastAPIPath(..., description="Name of the JSON file to delete")):
     """
