@@ -14,6 +14,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Path as FastAPIPath
 from fastapi import UploadFile, File, HTTPException, Header
 from fastapi.responses import FileResponse
+from fastapi import Form
 import string
 import tempfile
 
@@ -526,7 +527,7 @@ async def upload_json_file(file: UploadFile = File(...)):
 @app.post("/prompts/upload-file")
 async def upload_prompt_file(
     file: UploadFile = File(...),
-    name: str | None = None
+    name: str | None = Form(None)
 ):
     
     if not file.filename.endswith(".txt"):
