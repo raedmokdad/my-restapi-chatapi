@@ -29,13 +29,6 @@ AZURE_DEPLOYMENT = os.getenv("AZURE_DEPLOYMENT")
 AZURE_API_VERSION = os.getenv("AZURE_API_VERSION")
 API_PASSWORD = os.getenv("API_PASSWORD")
 
-# Where templates are stored (adjust if your files are elsewhere)
-PROMPT1_PATH = os.getenv("PROMPT1_PATH", "prompt1.txt")
-PROMPT2_PATH = os.getenv("PROMPT2_PATH", "prompt2.txt")
-PROMPT3_PATH = os.getenv("PROMPT3_PATH", "prompt3.txt")
-PROMPT4_PATH = os.getenv("PROMPT4_PATH", "prompt4.txt")
-MESSTYPE_PATH = os.getenv("MESSTYPE_PATH", "messagetype.txt")
-
 
 # Use env var so Railway mount path can be configured; fallback to local "jsons" for dev.
 JSONS_DIR = Path(os.environ.get("JSONS_DIR", "jsons"))
