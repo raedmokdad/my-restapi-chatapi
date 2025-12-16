@@ -750,16 +750,16 @@ async def delete_prompt(filename: str):
     
 
     
-@app.delete("/admin/clear-volume")
-async def clear_volume():
-    deleted = 0
+# @app.delete("/admin/clear-volume")
+# async def clear_volume():
+#     deleted = 0
 
-    for item in JSONS_DIR.iterdir():
-        if item.is_file():
-            item.unlink()
-            deleted += 1
+#     for item in JSONS_DIR.iterdir():
+#         if item.is_file():
+#             item.unlink()
+#             deleted += 1
 
-    return {
-        "message": "Volume cleared",
-        "files_deleted": deleted
-    }
+#     return {
+#         "message": "Volume cleared",
+#         "files_deleted": deleted
+#     }
