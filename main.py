@@ -298,6 +298,17 @@ async def generate_message(
     car: CarInfo,
     password: str = Header(None)
 ):
+    """
+    Generate a buyer message based on car info and person type.
+    Steps:
+    0) verify password
+    1) choose prompt template based on person_type
+    2) prepare fields dictionary for replacement
+    3) fill prompt and system
+    4) call azure openai
+    5) validate and possibly correct in a loop
+
+    """
     await verify_password(password)
     # 1) choose template
     prompt_template = load_prompt(car.person_type) # PROMPT_TEMPLATES.get(car.person_type)
@@ -472,6 +483,12 @@ async def generate_message(
 
 @app.post("/upload-json-file")
 async def upload_json_file(file: UploadFile = File(...)):
+    """
+    Upload a JSON file.
+    1. Validates that the file is a .json file.
+    2. Reads and validates the JSON content.
+    3. Atomically overwrites existing file or creates a new one.
+    """
     if not file.filename.endswith(".json"):
         raise HTTPException(status_code=400, detail="Only .json files are allowed")
     
@@ -519,7 +536,13 @@ async def upload_prompt_file(
     file: UploadFile = File(...),
     name: str | None = Form(None)
 ):
-    
+    """
+    Upload a prompt file.
+
+    1. Validates that the file is a .txt file.
+    2. Reads the content.
+    3. Atomically overwrites existing prompt file or creates a new one.
+    """
     if not file.filename.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Only .txt files are allowed")
 
@@ -551,6 +574,9 @@ async def upload_prompt_file(
 
 @app.post("/prompts/upload-system-file")
 async def upload_prompt_file(file: UploadFile = File(...)):
+    """
+    Upload the system prompt file named 'messagetype.txt'.
+    """
     # Only allow a file named 'messagetype.txt'
     if file.filename != "messagetype.txt":
         raise HTTPException(status_code=400, detail="Only 'messagetype.txt' is allowed")
@@ -584,12 +610,20 @@ async def upload_prompt_file(file: UploadFile = File(...)):
 
 @app.get("/list-jsons")
 async def list_jsons():
+    """
+    List all JSON files in the JSONS_DIR.
+
+    """
     files = [p.name for p in JSONS_DIR.glob("*.json")]
     return {"files": files}
 
 
 @app.get("/prompts")
 async def list_prompts():
+    """
+    List all prompt text files in the JSONS_DIR.
+
+    """
     if not JSONS_DIR.exists():
         return {"prompts": []}
 
@@ -607,6 +641,9 @@ async def list_prompts():
 
 @app.get("/read-json/{name}")
 async def read_json(name: str):
+    """
+    Read a JSON file by name (without .json extension)
+    """
     try:
         data = load_json(name)
     except FileNotFoundError:
@@ -630,6 +667,10 @@ async def view_prompt(name: str):
 
 @app.get("/download-json/{filename}")
 def download_json(filename: str):
+    """
+    Download a JSON file by filename.
+    """
+     # Ensure filename ends with .json
     if not filename.endswith(".json"):
         raise HTTPException(status_code=400, detail="Invalid file type")
 
@@ -647,6 +688,9 @@ def download_json(filename: str):
 
 @app.get("/prompts/download/{prompt_name}")
 def download_prompt(prompt_name: str):
+    """
+    Download a prompt text file by name.
+    """
     if not prompt_name.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Invalid file type")
     
@@ -684,6 +728,9 @@ async def delete_json(name: str = FastAPIPath(..., description="Name of the JSON
 
 @app.delete("/prompts/delete/{filename}")
 async def delete_prompt(filename: str):
+    """""
+    Delete a prompt file by name.
+    """
     # Ensure filename ends with .txt
     if not filename.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Only .txt files can be deleted.")
