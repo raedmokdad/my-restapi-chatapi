@@ -13,6 +13,7 @@ from typing import Any, Dict
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Path as FastAPIPath
 from fastapi import UploadFile, File, HTTPException, Header
+from fastapi.responses import FileResponse
 import string
 import tempfile
 
@@ -319,7 +320,7 @@ async def generate_message(
     # 1) choose template
     prompt_template = load_prompt(car.person_type) # PROMPT_TEMPLATES.get(car.person_type)
     if not prompt_template:
-        raise HTTPException(status_code=400, detail=f"Unknown person_type '{car.person_type}'. Valid: {list(PROMPT_TEMPLATES.keys())}")
+        raise HTTPException(status_code=400, detail=f"Unknown person_type '{car.person_type}'.")
     
     try:
         # Load JSON from volume
@@ -636,3 +637,19 @@ async def upload_json_file(file: UploadFile = File(...)):
         "message": "JSON file uploaded successfully (created or updated)",
         "filename": str(path)
     }
+
+@app.get("/download-json/{filename}")
+def download_json(filename: str):
+    if not filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    file_path = JSONS_DIR / filename
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        path=file_path,
+        media_type="application/json",
+        filename=filename
+    )
