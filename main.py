@@ -65,29 +65,29 @@ Message to evaluate:
 "{message}"
 
 Return JSON with this exact schema:
-{
-  "authenticity": {
+{{
+  "authenticity": {{
     "is_human_like": true/false,
     "confidence_percent": number,
     "reason": string
-  },
-  "tone": {
+  }},
+  "tone": {{
     "label": "casual | neutral | too_polite | unnatural",
     "confidence_percent": number,
     "reason": string
-  },
-  "relevance": {
+  }},
+  "relevance": {{
     "is_relevant": true/false,
     "confidence_percent": number,
     "reason": string
-  },
-  "naturalness": {
+  }},
+  "naturalness": {{
     "is_natural": true/false,
     "confidence_percent": number,
     "reason": string
-  },
+  }},
   "overall_human_confidence_percent": number
-}
+}}
 """
 
 class CreateJsonRequest(BaseModel):
