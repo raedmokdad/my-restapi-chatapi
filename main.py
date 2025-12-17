@@ -563,6 +563,18 @@ async def generate_message(
         # success: return validated message
         evaluation = evaluate_message(final_assistant_content)
         overall_confidence = evaluation.get("overall_human_confidence_percent", 0)
+
+        # i need to check if overall_confidence is > 70 :
+        if overall_confidence < 70:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "validation_errors": ["Overall human confidence percent is below acceptable threshold."],
+                    "assistant_content": final_assistant_content,
+                    "overall_human_confidence_percent": overall_confidence
+                }
+            )
+
         return {
             "message": final_assistant_content,
             "overall_human_confidence_percent": overall_confidence
