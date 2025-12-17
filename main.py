@@ -561,7 +561,7 @@ async def generate_message(
             )
     
         # success: return validated message
-        evaluation = evaluate_message(final_assistant_content)
+        evaluation = evaluate_message("Hello, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable.")
         overall_confidence = evaluation.get("overall_human_confidence_percent", 0)
 
         # i need to check if overall_confidence is > 70 :
