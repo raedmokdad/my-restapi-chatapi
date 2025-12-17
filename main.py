@@ -346,6 +346,16 @@ def normalize_prices_in_text(text: str) -> str:
     return re.sub(r"\d[\d.,\s]*\d", repl, text)
 
 
+def safe_json_parse(content: str):
+    content = content.strip()
+
+    # Case 1: JSON returned as a quoted string
+    if content.startswith('"') and content.endswith('"'):
+        content = json.loads(content)  # unwrap string → JSON text
+
+    # Case 2: Now parse actual JSON
+    return json.loads(content)
+
 
 def evaluate_message(message: str):
     response = client.chat.completions.create(
@@ -360,18 +370,14 @@ def evaluate_message(message: str):
         ],
     )
 
-    content = response.choices[0].message.content
+    raw = response.choices[0].message.content
 
-    # Print or log raw content
     print("=== GROK RAW OUTPUT ===")
-    print(repr(content))   # use repr to see newlines, quotes, etc.
+    print(repr(raw))
     print("======================")
 
-    # # Optional: save to file for full inspection
-    # with open("grok_output_debug.txt", "w", encoding="utf-8") as f:
-    #     f.write(content)
-
-    return content  # temporarily return raw string to see it in response
+    parsed = safe_json_parse(raw)
+    return parsed
         
 
 
