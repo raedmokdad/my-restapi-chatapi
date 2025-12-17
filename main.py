@@ -562,7 +562,12 @@ async def generate_message(
     
         # success: return validated message
         evaluation = evaluate_message(final_assistant_content)
-        return evaluation
+        overall_confidence = evaluation.get("overall_human_confidence_percent", 0)
+        return {
+            "message": final_assistant_content,
+            "overall_human_confidence_percent": overall_confidence
+        }
+       
     
     except FileNotFoundError:
         raise HTTPException(
