@@ -361,8 +361,8 @@ def evaluate_message(message: str):
             model="grok-4-1-fast-non-reasoning",
             temperature=0.2,
             messages=[
-                {"role": "system", "content": "Return ONLY strict JSON, no markdown, no explanations."},
-                {"role": "user", "content": f"Evaluate this message: '{message}'"}
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": USER_PROMPT_TEMPLATE.format(message=message)}
             ],
         )
 
