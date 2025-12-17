@@ -346,18 +346,18 @@ def normalize_prices_in_text(text: str) -> str:
     return re.sub(r"\d[\d.,\s]*\d", repl, text)
 
 
-def extract_json_from_text(text: str):
+def safe_parse_grok_json(response_text: str):
     """
-    Extract the first JSON object from a string.
-    Strips code fences, leading/trailing whitespace, etc.
+    Extract the first JSON object from Grok output, safely.
     """
     # Remove markdown fences
-    text = re.sub(r"```json|```", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"```json|```", "", response_text, flags=re.IGNORECASE).strip()
 
-    # Find first JSON object in text
+    # Search for JSON object
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
-        raise ValueError("No JSON object found in model response")
+        # Include raw text for debugging
+        raise ValueError(f"No JSON object found in response:\n{text}")
 
     json_text = match.group()
     return json.loads(json_text)
@@ -372,13 +372,15 @@ def evaluate_message(message: str):
         ],
     )
 
-    content = response.choices[0].message.content
+    raw_content = response.choices[0].message.content
     try:
-        return extract_json_from_text(content)
+        return safe_parse_grok_json(raw_content)
     except ValueError as e:
-        # For debugging: include the raw model response
-        raise ValueError(f"Failed to parse JSON. Raw model response:\n{content}\nError: {e}")
-
+        # Include raw Grok output for debugging
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to parse Grok output for: {e}\nRaw output:\n{raw_content}"
+        )
 
 
 @app.post("/generate-message")
