@@ -48,8 +48,6 @@ client = OpenAI(
 SYSTEM_PROMPT = """
 You are a message quality evaluator.
 
-You must analyze a buyer message written to a student selling a car.
-
 Evaluate the message on the following dimensions:
 1. Authenticity (human-like vs bot-like)
 2. Tone (casual, neutral, too polite, unnatural)
@@ -347,6 +345,7 @@ def normalize_prices_in_text(text: str) -> str:
 
 
 def safe_json_parse(content: str):
+    """Safely parse JSON content that may be wrapped in quotes or malformed."""
     content = content.strip()
 
     # Case 1: JSON returned as a quoted string
@@ -358,6 +357,8 @@ def safe_json_parse(content: str):
 
 
 def evaluate_message(message: str):
+    """Evaluate the message using Grok model and return parsed JSON."""
+
     response = client.chat.completions.create(
         model="grok-4-1-fast-non-reasoning",
         temperature=0.2,
