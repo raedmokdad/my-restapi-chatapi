@@ -368,32 +368,47 @@ def extract_grok_json(text: str) -> dict:
     return json.loads(json_str)
 
 
+# def evaluate_message(message: str):
+#     raw_output = ""  # <-- initialize
+#     try:
+#         response = client.chat.completions.create(
+#             model="grok-4-1-fast-non-reasoning",
+#             temperature=0.2,
+#             messages=[
+#                 {"role": "system", "content": SYSTEM_PROMPT},
+#                 {"role": "user", "content": USER_PROMPT_TEMPLATE.format(message=message)}
+#             ],
+#         )
+
+#         raw_output = response.choices[0].message.content
+#         print("RAW GROK OUTPUT:", raw_output)
+
+#         result = extract_grok_json(raw_output)
+#         return result
+
+#     except Exception as e:
+#         print("ERROR:", e)
+#         print("RAW OUTPUT WHEN ERROR OCCURRED:", raw_output)
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"Grok returned invalid JSON: {str(e)}"
+#         )
+
 def evaluate_message(message: str):
-    raw_output = ""  # <-- initialize
-    try:
-        response = client.chat.completions.create(
-            model="grok-4-1-fast-non-reasoning",
-            temperature=0.2,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": USER_PROMPT_TEMPLATE.format(message=message)}
-            ],
-        )
+    response = client.chat.completions.create(
+        model="grok-4-1-fast-non-reasoning",
+        temperature=0.2,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": USER_PROMPT_TEMPLATE.format(message=message)
+            }
+        ],
+    )
 
-        raw_output = response.choices[0].message.content
-        print("RAW GROK OUTPUT:", raw_output)
-
-        result = extract_grok_json(raw_output)
-        return result
-
-    except Exception as e:
-        print("ERROR:", e)
-        print("RAW OUTPUT WHEN ERROR OCCURRED:", raw_output)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Grok returned invalid JSON: {str(e)}"
-        )
-
+    content = response.choices[0].message.content
+    return content
 
 @app.post("/generate-message")
 async def generate_message(
@@ -544,7 +559,7 @@ async def generate_message(
     
         # success: return validated message
         evaluation = evaluate_message(final_assistant_content)
-        return {"message": final_assistant_content, "evaluation": evaluation}
+        return evaluation
     
     except FileNotFoundError:
         raise HTTPException(
