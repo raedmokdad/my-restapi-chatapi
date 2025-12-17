@@ -347,53 +347,6 @@ def normalize_prices_in_text(text: str) -> str:
 
 
 
-def extract_grok_json(text: str) -> dict:
-    """
-    Extract the JSON object from Grok output.
-    Handles <|control12|> and extra text around JSON.
-    """
-    # Regex: find first { ... } after <|control\d+|>
-    match = re.search(r"<\|control\d+\|>\s*(\{.*\})", text, re.DOTALL)
-    if not match:
-        # fallback: try to find any { ... } in text
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if not match:
-            raise ValueError("No JSON object found in Grok output")
-    
-    json_str = match.group(1)
-    
-    # fix smart quotes
-    json_str = json_str.replace("“", '"').replace("”", '"')
-    
-    return json.loads(json_str)
-
-
-# def evaluate_message(message: str):
-#     raw_output = ""  # <-- initialize
-#     try:
-#         response = client.chat.completions.create(
-#             model="grok-4-1-fast-non-reasoning",
-#             temperature=0.2,
-#             messages=[
-#                 {"role": "system", "content": SYSTEM_PROMPT},
-#                 {"role": "user", "content": USER_PROMPT_TEMPLATE.format(message=message)}
-#             ],
-#         )
-
-#         raw_output = response.choices[0].message.content
-#         print("RAW GROK OUTPUT:", raw_output)
-
-#         result = extract_grok_json(raw_output)
-#         return result
-
-#     except Exception as e:
-#         print("ERROR:", e)
-#         print("RAW OUTPUT WHEN ERROR OCCURRED:", raw_output)
-#         raise HTTPException(
-#             status_code=500,
-#             detail=f"Grok returned invalid JSON: {str(e)}"
-#         )
-
 def evaluate_message(message: str):
     response = client.chat.completions.create(
         model="grok-4-1-fast-non-reasoning",
@@ -408,7 +361,24 @@ def evaluate_message(message: str):
     )
 
     content = response.choices[0].message.content
-    return content
+
+    # Clean up any leading/trailing whitespace
+    content = content.strip()
+
+    try:
+        parsed = json.loads(content)
+        return parsed
+    except json.JSONDecodeError:
+        # Optional: try to fix minor issues like single quotes → double quotes
+        content_fixed = content.replace("'", '"')
+        try:
+            parsed = json.loads(content_fixed)
+            return parsed
+        except json.JSONDecodeError as e:
+            # Still invalid, raise proper exception
+            raise ValueError(f"Failed to parse Grok output as JSON: {e}\nContent:\n{content}")
+        
+        
 
 @app.post("/generate-message")
 async def generate_message(
