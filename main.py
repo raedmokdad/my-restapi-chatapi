@@ -39,12 +39,13 @@ JSONS_DIR.mkdir(parents=True, exist_ok=True)
 FILENAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 MAX_ATTEMPTS = 3
 
-
+# Initialize Grok client
 grok_client = OpenAI(
     api_key=os.getenv("Grok_Api_Key"),
     base_url=os.getenv("Grok_Base_Url")
 )
 
+# Grok prompts
 Grok_SYSTEM_PROMPT = """
 You are a message quality evaluator.
 
@@ -57,35 +58,74 @@ Evaluate the message on the following dimensions:
 Return ONLY valid JSON.
 Do NOT add explanations outside JSON.
 """
+# Grok user prompt template
+# Grok_USER_PROMPT_TEMPLATE = """
+# Message to evaluate:
+# "{message}"
+
+# Return JSON with this exact schema:
+# {{
+#   "authenticity": {{
+#     "is_human_like": true/false,
+#     "confidence_percent": number,
+#     "reason": string
+#   }},
+#   "tone": {{
+#     "label": "casual | neutral | too_polite | unnatural",
+#     "confidence_percent": number,
+#     "reason": string
+#   }},
+#   "relevance": {{
+#     "is_relevant": true/false,
+#     "confidence_percent": number,
+#     "reason": string
+#   }},
+#   "naturalness": {{
+#     "is_natural": true/false,
+#     "confidence_percent": number,
+#     "reason": string
+#   }},
+#   "overall_human_confidence_percent": number
+# }}
+# """
 
 Grok_USER_PROMPT_TEMPLATE = """
 Message to evaluate:
 "{message}"
 
-Return JSON with this exact schema:
+Return ONLY valid JSON with this exact schema:
 {{
   "authenticity": {{
     "is_human_like": true/false,
-    "confidence_percent": number,
-    "reason": string
+    "confidence_percent": number
   }},
   "tone": {{
     "label": "casual | neutral | too_polite | unnatural",
-    "confidence_percent": number,
-    "reason": string
+    "confidence_percent": number
   }},
   "relevance": {{
     "is_relevant": true/false,
-    "confidence_percent": number,
-    "reason": string
+    "confidence_percent": number
   }},
   "naturalness": {{
     "is_natural": true/false,
-    "confidence_percent": number,
-    "reason": string
+    "confidence_percent": number
   }},
-  "overall_human_confidence_percent": number
+  "overall_human_confidence_percent": number,
+  "reasons": [
+    {{
+      "category": "authenticity | tone | relevance | naturalness",
+      "message": string,
+      "severity": "info | warning"
+    }}
+  ]
 }}
+Rules:
+- Always include at least one reason per category.
+- Add reasons even when the evaluation is positive.
+- Use severity "warning" only if confidence_percent < 70 or boolean is false.
+- Keep messages concise and human-readable.
+- Do NOT wrap the JSON in quotes.
 """
 
 class CreateJsonRequest(BaseModel):
@@ -160,14 +200,6 @@ if not (AZURE_ENDPOINT and AZURE_API_KEY):
 
 app = FastAPI(title="Car Buyer Message API")
 
-# Load templates at startup
-def _load_file(path: str) -> str:
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        return ""
-
 
 class CarInfo(BaseModel):
     seller: str
@@ -188,6 +220,8 @@ class CarInfo(BaseModel):
 
 
 async def verify_password(password: str = Header(None)):
+    """Verify the provided password against the server's API_PASSWORD."""
+
     if API_PASSWORD is None:
         raise HTTPException(500, "API password not set on server.")
     if password != API_PASSWORD:
@@ -343,19 +377,6 @@ def normalize_prices_in_text(text: str) -> str:
         return re.sub(r"[.,\s]", "", number)  # remove commas, dots, spaces
     return re.sub(r"\d[\d.,\s]*\d", repl, text)
 
-
-def safe_json_parse(content: str):
-    """Safely parse JSON content that may be wrapped in quotes or malformed."""
-    content = content.strip()
-
-    # Case 1: JSON returned as a quoted string
-    if content.startswith('"') and content.endswith('"'):
-        content = json.loads(content)  # unwrap string → JSON text
-
-    # Case 2: Now parse actual JSON
-    return json.loads(content)
-
-
 def evaluate_message(message: str):
     """Evaluate the message using Grok model and return parsed JSON."""
 
@@ -380,7 +401,16 @@ def evaluate_message(message: str):
     parsed = safe_json_parse(raw)
     return parsed
         
+def safe_json_parse(content: str):
+    """Safely parse JSON content that may be wrapped in quotes or malformed."""
+    content = content.strip()
 
+    # Case 1: JSON returned as a quoted string
+    if content.startswith('"') and content.endswith('"'):
+        content = json.loads(content)  # unwrap string → JSON text
+
+    # Case 2: Now parse actual JSON
+    return json.loads(content)
 
 @app.post("/generate-message")
 async def generate_message(
@@ -396,6 +426,7 @@ async def generate_message(
     3) fill prompt and system
     4) call azure openai
     5) validate and possibly correct in a loop
+    6) Returns the final validated message evaluation.
 
     """
     await verify_password(password)
@@ -541,35 +572,9 @@ async def generate_message(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error loading JSON for '{car.person_type}': {e}"
+            detail=f"Error  '{car.person_type}': {e}"
         )
 
-# @app.post("/create-json", status_code=201)
-# async def create_json(payload: CreateJsonRequest):
-#     try:
-#         path = filepath_for(payload.name)
-#     except ValueError as e:
-#         raise HTTPException(status_code=400, detail=str(e))
-
-#     try:
-#         # atomic-ish write: write to temp file then rename
-#         tmp = path.with_suffix(".tmp")
-#         with tmp.open("w", encoding="utf-8") as f:
-#             json.dump(payload.proplist, f, ensure_ascii=False, indent=2)
-#             f.flush()
-#         tmp.replace(path)  # overwrite existing file if exists
-#     except Exception as e:
-#         if path.exists():
-#             try:
-#                 path.unlink()
-#             except Exception:
-#                 pass
-#         raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
-
-#     return {
-#         "message": "created/updated",
-#         "filename": str(path)
-#     }
 
 @app.post("/upload-json-file")
 async def upload_json_file(file: UploadFile = File(...)):
