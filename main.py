@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi import Form
 import string
 import tempfile
+from openai import OpenAI
 
 
 # Load environment variables from .env file if it exists
@@ -37,6 +38,57 @@ JSONS_DIR.mkdir(parents=True, exist_ok=True)
 # Allow letters, numbers, hyphen, underscore, and dot
 FILENAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 MAX_ATTEMPTS = 3
+
+
+client = OpenAI(
+    api_key=os.getenv("Grok_Api_Key"),
+    base_url=os.getenv("Grok_Base_Url")
+)
+
+SYSTEM_PROMPT = """
+You are a message quality evaluator.
+
+You must analyze a buyer message written to a student selling a car.
+
+Evaluate the message on the following dimensions:
+1. Authenticity (human-like vs bot-like)
+2. Tone (casual, neutral, too polite, unnatural)
+3. Relevance (fits the car and listing context)
+4. Naturalness (sounds like a real student / young buyer)
+
+Return ONLY valid JSON.
+Do NOT add explanations outside JSON.
+"""
+
+USER_PROMPT_TEMPLATE = """
+Message to evaluate:
+"{message}"
+
+Return JSON with this exact schema:
+{
+  "authenticity": {
+    "is_human_like": true/false,
+    "confidence_percent": number,
+    "reason": string
+  },
+  "tone": {
+    "label": "casual | neutral | too_polite | unnatural",
+    "confidence_percent": number,
+    "reason": string
+  },
+  "relevance": {
+    "is_relevant": true/false,
+    "confidence_percent": number,
+    "reason": string
+  },
+  "naturalness": {
+    "is_natural": true/false,
+    "confidence_percent": number,
+    "reason": string
+  },
+  "overall_human_confidence_percent": number
+}
+"""
 
 class CreateJsonRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Filename (without path)")
@@ -293,6 +345,25 @@ def normalize_prices_in_text(text: str) -> str:
         return re.sub(r"[.,\s]", "", number)  # remove commas, dots, spaces
     return re.sub(r"\d[\d.,\s]*\d", repl, text)
 
+
+def evaluate_message(message: str):
+    response = client.chat.completions.create(
+        model="grok-4-1-fast-non-reasoning",
+        temperature=0.2,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": USER_PROMPT_TEMPLATE.format(message=message)
+            }
+        ],
+    )
+
+    content = response.choices[0].message.content
+    return json.loads(content)
+
+
+
 @app.post("/generate-message")
 async def generate_message(
     car: CarInfo,
@@ -439,9 +510,10 @@ async def generate_message(
                     "attempts": attempt - 1
                 }
             )
-
+    
         # success: return validated message
-        return {"message": final_assistant_content}
+        evaluation = evaluate_message(final_assistant_content)
+        return {"message": final_assistant_content, "evaluation": evaluation}
     
     except FileNotFoundError:
         raise HTTPException(
