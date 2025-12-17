@@ -345,11 +345,23 @@ def normalize_prices_in_text(text: str) -> str:
         return re.sub(r"[.,\s]", "", number)  # remove commas, dots, spaces
     return re.sub(r"\d[\d.,\s]*\d", repl, text)
 
+def safe_json_parse(text: str):
+    # remove markdown fences
+    text = re.sub(r"```json|```", "", text).strip()
+
+    # extract first JSON object
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        raise ValueError("No JSON object found in model response")
+
+    return json.loads(match.group())
+
 
 def evaluate_message(message: str):
     response = client.chat.completions.create(
         model="grok-4-1-fast-non-reasoning",
-        temperature=0.2,
+        temperature=0.0,
+        response_format={"type": "json_object"},  # ⭐ IMPORTANT
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {
@@ -360,7 +372,7 @@ def evaluate_message(message: str):
     )
 
     content = response.choices[0].message.content
-    return json.loads(content)
+    return safe_json_parse(content)
 
 
 
