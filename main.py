@@ -346,41 +346,37 @@ def normalize_prices_in_text(text: str) -> str:
     return re.sub(r"\d[\d.,\s]*\d", repl, text)
 
 
-def safe_parse_grok_json(response_text: str):
-    """
-    Extract the first JSON object from Grok output, safely.
-    """
-    # Remove markdown fences
-    text = re.sub(r"```json|```", "", response_text, flags=re.IGNORECASE).strip()
 
-    # Search for JSON object
+def extract_json(text: str) -> dict:
+    # Extract first {...} block
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
-        # Include raw text for debugging
-        raise ValueError(f"No JSON object found in response:\n{text}")
+        raise ValueError("No JSON object found in model output")
+    return json.loads(match.group())
 
-    json_text = match.group()
-    return json.loads(json_text)
 
 def evaluate_message(message: str):
-    response = client.chat.completions.create(
-        model="grok-4-1-fast-non-reasoning",
-        temperature=0.0,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": USER_PROMPT_TEMPLATE.format(message=message)}
-        ],
-    )
-
-    raw_content = response.choices[0].message.content
     try:
-        return safe_parse_grok_json(raw_content)
-    except ValueError as e:
-        # Include raw Grok output for debugging
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to parse Grok output for: {e}\nRaw output:\n{raw_content}"
+        response = client.chat.completions.create(
+            model="grok-4-1-fast-non-reasoning",
+            temperature=0.2,
+            messages=[
+                {"role": "system", "content": "Return ONLY strict JSON, no markdown, no explanations."},
+                {"role": "user", "content": f"Evaluate this message: '{message}'"}
+            ],
         )
+
+        raw_output = response.choices[0].message.content
+        print("RAW GROK OUTPUT:", raw_output)  # <-- This will appear in Railway logs
+
+        result = extract_json(raw_output)
+        return result
+
+    except Exception as e:
+        # Log full exception and raw output
+        print("ERROR:", e)
+        print("RAW OUTPUT WHEN ERROR OCCURRED:", raw_output)
+        raise HTTPException(status_code=500, detail=f"Grok returned invalid JSON: {str(e)}")
 
 
 @app.post("/generate-message")
