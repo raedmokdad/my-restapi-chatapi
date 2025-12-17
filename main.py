@@ -577,6 +577,7 @@ async def generate_message(
 
         return {
             "message": final_assistant_content,
+            "evaluation": evaluation,
             "overall_human_confidence_percent": overall_confidence
         }
        
