@@ -40,12 +40,12 @@ FILENAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 MAX_ATTEMPTS = 3
 
 
-client = OpenAI(
+grok_client = OpenAI(
     api_key=os.getenv("Grok_Api_Key"),
     base_url=os.getenv("Grok_Base_Url")
 )
 
-SYSTEM_PROMPT = """
+Grok_SYSTEM_PROMPT = """
 You are a message quality evaluator.
 
 Evaluate the message on the following dimensions:
@@ -58,7 +58,7 @@ Return ONLY valid JSON.
 Do NOT add explanations outside JSON.
 """
 
-USER_PROMPT_TEMPLATE = """
+Grok_USER_PROMPT_TEMPLATE = """
 Message to evaluate:
 "{message}"
 
@@ -359,14 +359,14 @@ def safe_json_parse(content: str):
 def evaluate_message(message: str):
     """Evaluate the message using Grok model and return parsed JSON."""
 
-    response = client.chat.completions.create(
+    response = grok_client.chat.completions.create(
         model="grok-4-1-fast-non-reasoning",
         temperature=0.2,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": Grok_SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": USER_PROMPT_TEMPLATE.format(message=message)
+                "content": Grok_USER_PROMPT_TEMPLATE.format(message=message)
             }
         ],
     )
