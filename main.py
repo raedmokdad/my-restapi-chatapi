@@ -345,34 +345,39 @@ def normalize_prices_in_text(text: str) -> str:
         return re.sub(r"[.,\s]", "", number)  # remove commas, dots, spaces
     return re.sub(r"\d[\d.,\s]*\d", repl, text)
 
-def safe_json_parse(text: str):
-    # remove markdown fences
-    text = re.sub(r"```json|```", "", text).strip()
 
-    # extract first JSON object
+def extract_json_from_text(text: str):
+    """
+    Extract the first JSON object from a string.
+    Strips code fences, leading/trailing whitespace, etc.
+    """
+    # Remove markdown fences
+    text = re.sub(r"```json|```", "", text, flags=re.IGNORECASE).strip()
+
+    # Find first JSON object in text
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
         raise ValueError("No JSON object found in model response")
 
-    return json.loads(match.group())
-
+    json_text = match.group()
+    return json.loads(json_text)
 
 def evaluate_message(message: str):
     response = client.chat.completions.create(
         model="grok-4-1-fast-non-reasoning",
         temperature=0.0,
-        response_format={"type": "json_object"},  # ⭐ IMPORTANT
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": USER_PROMPT_TEMPLATE.format(message=message)
-            }
+            {"role": "user", "content": USER_PROMPT_TEMPLATE.format(message=message)}
         ],
     )
 
     content = response.choices[0].message.content
-    return safe_json_parse(content)
+    try:
+        return extract_json_from_text(content)
+    except ValueError as e:
+        # For debugging: include the raw model response
+        raise ValueError(f"Failed to parse JSON. Raw model response:\n{content}\nError: {e}")
 
 
 
