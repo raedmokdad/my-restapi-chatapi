@@ -412,6 +412,58 @@ def safe_json_parse(content: str):
     # Case 2: Now parse actual JSON
     return json.loads(content)
 
+
+REWRITE_SYSTEM_PROMPT = """
+You rewrite buyer messages to sound more human, casual, and natural.
+
+Rules:
+- Keep the original intent (interest in buying the car).
+- Do NOT add new facts.
+- Do NOT mention that this is a rewrite.
+- Write like a real student or young private buyer.
+- Output EXACTLY ONE sentence.
+- Do NOT exceed 35 words.
+"""
+
+REWRITE_USER_PROMPT_TEMPLATE = """
+Original message:
+"{message}"
+
+Problems detected:
+{problems}
+
+Rewrite the message to fix the problems above.
+Return ONLY the rewritten message, no quotes, no explanations.
+"""
+
+def extract_warning_reasons(result: dict):
+    """Extract warning messages from the evaluation result."""
+    return [
+        r["message"]
+        for r in result.get("reasons", [])
+        if r.get("severity") == "warning"
+    ]
+
+def rewrite_message(original_message: str, warning_reasons: list[str]):
+    problems_text = "\n".join(f"- {r}" for r in warning_reasons)
+
+    response = grok_client.chat.completions.create(
+        model="grok-4-1-fast-non-reasoning",
+        temperature=0.4,
+        messages=[
+            {"role": "system", "content": REWRITE_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": REWRITE_USER_PROMPT_TEMPLATE.format(
+                    message=original_message,
+                    problems=problems_text
+                )
+            }
+        ],
+    )
+
+    return response.choices[0].message.content.strip()
+
 @app.post("/generate-message")
 async def generate_message(
     car: CarInfo,
@@ -566,14 +618,24 @@ async def generate_message(
 
         # i need to check if overall_confidence is > 70 :
         if overall_confidence < 70:
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "validation_errors": ["Overall human confidence percent is below acceptable threshold."],
-                    "assistant_content": final_assistant_content,
-                    "overall_human_confidence_percent": overall_confidence
-                }
-            )
+            # Extract warnings
+            warnings = extract_warning_reasons(evaluation)
+
+            # Rewrite
+            rewritten_message = rewrite_message("Hello, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable.", warnings)
+
+            # Re-evaluate
+            second_result = evaluate_message(rewritten_message)
+            new_score = second_result["overall_human_confidence_percent"]
+            return {
+                    "final_message": rewritten_message,
+                    "original_score": overall_confidence,
+                    "final_score": new_score,
+                    "rewritten": True,
+                    "improved": new_score > overall_confidence,
+                    "evaluation": second_result
+            }
+            
 
         return {
             "message": final_assistant_content,
