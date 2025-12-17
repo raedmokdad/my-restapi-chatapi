@@ -362,23 +362,18 @@ def evaluate_message(message: str):
 
     content = response.choices[0].message.content
 
-    # Clean up any leading/trailing whitespace
-    content = content.strip()
+    # Print or log raw content
+    print("=== GROK RAW OUTPUT ===")
+    print(repr(content))   # use repr to see newlines, quotes, etc.
+    print("======================")
 
-    try:
-        parsed = json.loads(content)
-        return parsed
-    except json.JSONDecodeError:
-        # Optional: try to fix minor issues like single quotes → double quotes
-        content_fixed = content.replace("'", '"')
-        try:
-            parsed = json.loads(content_fixed)
-            return parsed
-        except json.JSONDecodeError as e:
-            # Still invalid, raise proper exception
-            raise ValueError(f"Failed to parse Grok output as JSON: {e}\nContent:\n{content}")
+    # # Optional: save to file for full inspection
+    # with open("grok_output_debug.txt", "w", encoding="utf-8") as f:
+    #     f.write(content)
+
+    return content  # temporarily return raw string to see it in response
         
-        
+
 
 @app.post("/generate-message")
 async def generate_message(
