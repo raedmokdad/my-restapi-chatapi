@@ -347,15 +347,29 @@ def normalize_prices_in_text(text: str) -> str:
 
 
 
-def extract_json(text: str) -> dict:
-    # Extract first {...} block
-    match = re.search(r"\{.*\}", text, re.DOTALL)
+def extract_grok_json(text: str) -> dict:
+    """
+    Extract the JSON object from Grok output.
+    Handles <|control12|> and extra text around JSON.
+    """
+    # Regex: find first { ... } after <|control\d+|>
+    match = re.search(r"<\|control\d+\|>\s*(\{.*\})", text, re.DOTALL)
     if not match:
-        raise ValueError("No JSON object found in model output")
-    return json.loads(match.group())
+        # fallback: try to find any { ... } in text
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON object found in Grok output")
+    
+    json_str = match.group(1)
+    
+    # fix smart quotes
+    json_str = json_str.replace("“", '"').replace("”", '"')
+    
+    return json.loads(json_str)
 
 
 def evaluate_message(message: str):
+    raw_output = ""  # <-- initialize
     try:
         response = client.chat.completions.create(
             model="grok-4-1-fast-non-reasoning",
@@ -367,16 +381,18 @@ def evaluate_message(message: str):
         )
 
         raw_output = response.choices[0].message.content
-        print("RAW GROK OUTPUT:", raw_output)  # <-- This will appear in Railway logs
+        print("RAW GROK OUTPUT:", raw_output)
 
-        result = extract_json(raw_output)
+        result = extract_grok_json(raw_output)
         return result
 
     except Exception as e:
-        # Log full exception and raw output
         print("ERROR:", e)
         print("RAW OUTPUT WHEN ERROR OCCURRED:", raw_output)
-        raise HTTPException(status_code=500, detail=f"Grok returned invalid JSON: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Grok returned invalid JSON: {str(e)}"
+        )
 
 
 @app.post("/generate-message")
