@@ -225,6 +225,7 @@ CRITICAL RULES (MUST FOLLOW EXACTLY):
 - Do NOT change spelling, casing, separators, or formatting of features.
 - If a feature is "CRV", you MUST write "CRV", not "CR-V".
 - If a feature is "Automatik", you MUST write "Automatik", not "automatic".
+- If a feature is "Manuell", you MUST write "Manuell", not "manual".
 - Ensure ALL required car features are included verbatim.
 
 OUTPUT RULES:
