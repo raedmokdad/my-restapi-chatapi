@@ -135,7 +135,7 @@ if not (AZURE_ENDPOINT and AZURE_API_KEY):
     print("Warning: AZURE_ENDPOINT or AZURE_API_KEY not set. Set them as environment variables.")
 
 
-# Grok prompts
+# Grok prompts for first evaluation
 Grok_SYSTEM_PROMPT = """
 You are a message quality evaluator.
 
@@ -188,6 +188,7 @@ Rules:
 - Do NOT wrap the JSON in quotes.
 """
 
+# Rewrite prompts for fixing issues and rewriting
 REWRITE_SYSTEM_PROMPT = """
 You rewrite buyer messages to sound more human, casual, and natural.
 
@@ -211,7 +212,7 @@ Rewrite the message to fix the problems above.
 Return ONLY the rewritten message, no quotes, no explanations.
 """
 
-
+# Grok fix validation prompts for fixing validation errors
 GROK_FIX_VALIDATION_SYSTEM_PROMPT = """
 You rewrite buyer messages to sound more human, casual, and natural.
 
@@ -545,7 +546,8 @@ async def generate_message(
         }
 
         # --- Convert Features ---
-        filtered_features_dict = {key: fields.get(key, "") for key in features}
+        EXCLUDE_KEYS = {"seller", "price", "buyer"}
+        filtered_features_dict = {key: fields.get(key, "") for key in features if key not in EXCLUDE_KEYS}
         filtered_features = ", ".join(f"{k}={v}" for k, v in filtered_features_dict.items() if v)
         # --- Convert Greetinglist ---
         greeting_list_str = ", ".join(greeting_list)
@@ -676,9 +678,8 @@ async def generate_message(
                     "final_message": rewritten_message,
                     "original_score": overall_confidence,
                     "final_score": new_score,
-                    "rewritten": True,
                     "improved": new_score > overall_confidence,
-                    "evaluation": second_result,
+                    "rewritten": True,
                     "Validated": is_validated
             }
             
