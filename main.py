@@ -45,89 +45,6 @@ grok_client = OpenAI(
     base_url=os.getenv("Grok_Base_Url")
 )
 
-# Grok prompts
-Grok_SYSTEM_PROMPT = """
-You are a message quality evaluator.
-
-Evaluate the message on the following dimensions:
-1. Authenticity (human-like vs bot-like)
-2. Tone (casual, neutral, too polite, unnatural)
-3. Relevance (fits the car and listing context)
-4. Naturalness (sounds like a real student / young buyer)
-
-Return ONLY valid JSON.
-Do NOT add explanations outside JSON.
-"""
-# Grok user prompt template
-# Grok_USER_PROMPT_TEMPLATE = """
-# Message to evaluate:
-# "{message}"
-
-# Return JSON with this exact schema:
-# {{
-#   "authenticity": {{
-#     "is_human_like": true/false,
-#     "confidence_percent": number,
-#     "reason": string
-#   }},
-#   "tone": {{
-#     "label": "casual | neutral | too_polite | unnatural",
-#     "confidence_percent": number,
-#     "reason": string
-#   }},
-#   "relevance": {{
-#     "is_relevant": true/false,
-#     "confidence_percent": number,
-#     "reason": string
-#   }},
-#   "naturalness": {{
-#     "is_natural": true/false,
-#     "confidence_percent": number,
-#     "reason": string
-#   }},
-#   "overall_human_confidence_percent": number
-# }}
-# """
-
-Grok_USER_PROMPT_TEMPLATE = """
-Message to evaluate:
-"{message}"
-
-Return ONLY valid JSON with this exact schema:
-{{
-  "authenticity": {{
-    "is_human_like": true/false,
-    "confidence_percent": number
-  }},
-  "tone": {{
-    "label": "casual | neutral | too_polite | unnatural",
-    "confidence_percent": number
-  }},
-  "relevance": {{
-    "is_relevant": true/false,
-    "confidence_percent": number
-  }},
-  "naturalness": {{
-    "is_natural": true/false,
-    "confidence_percent": number
-  }},
-  "overall_human_confidence_percent": number,
-  "reasons": [
-    {{
-      "category": "authenticity | tone | relevance | naturalness",
-      "message": string,
-      "severity": "info | warning"
-    }}
-  ]
-}}
-Rules:
-- Always include at least one reason per category.
-- Add reasons even when the evaluation is positive.
-- Use severity "warning" only if confidence_percent < 70 or boolean is false.
-- Keep messages concise and human-readable.
-- Do NOT wrap the JSON in quotes.
-"""
-
 class CreateJsonRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Filename (without path)")
     proplist: Dict[str, Any] = Field(..., description="Arbitrary JSON object to store")
@@ -136,6 +53,25 @@ class CreateJsonRequest(BaseModel):
 class UploadPromptRequest(BaseModel):
     name: str
     content: str
+
+class CarInfo(BaseModel):
+    seller: str
+    make: str
+    model: str
+    year: Optional[str] = None
+    gearbox: Optional[str] = None
+    fuel: Optional[str] = None
+    km: Optional[str] = None
+    type: Optional[str] = None
+    price: Optional[str] = None
+    description: Optional[str] = ""
+    phone: Optional[str] = ""
+    buyer: Optional[str] = ""
+    person_type: str  # "person1" or "person2" (decides which prompt to use)
+    max_tokens: Optional[int] = 40  # max tokens for response    
+
+# FastAPI app
+app = FastAPI(title="Car Buyer Message API")
 
 def sanitize_filename(name: str) -> str:
     """
@@ -198,25 +134,111 @@ if not (AZURE_ENDPOINT and AZURE_API_KEY):
     # For safety: app will start but will reject requests if keys missing
     print("Warning: AZURE_ENDPOINT or AZURE_API_KEY not set. Set them as environment variables.")
 
-app = FastAPI(title="Car Buyer Message API")
+
+# Grok prompts
+Grok_SYSTEM_PROMPT = """
+You are a message quality evaluator.
+
+Evaluate the message on the following dimensions:
+1. Authenticity (human-like vs bot-like)
+2. Tone (casual, neutral, too polite, unnatural)
+3. Relevance (fits the car and listing context)
+4. Naturalness (sounds like a real student / young buyer)
+
+Return ONLY valid JSON.
+Do NOT add explanations outside JSON.
+"""
+
+Grok_USER_PROMPT_TEMPLATE = """
+Message to evaluate:
+"{message}"
+
+Return ONLY valid JSON with this exact schema:
+{{
+  "authenticity": {{
+    "is_human_like": true/false,
+    "confidence_percent": number
+  }},
+  "tone": {{
+    "label": "casual | neutral | too_polite | unnatural",
+    "confidence_percent": number
+  }},
+  "relevance": {{
+    "is_relevant": true/false,
+    "confidence_percent": number
+  }},
+  "naturalness": {{
+    "is_natural": true/false,
+    "confidence_percent": number
+  }},
+  "overall_human_confidence_percent": number,
+  "reasons": [
+    {{
+      "category": "authenticity | tone | relevance | naturalness",
+      "message": string,
+      "severity": "info | warning"
+    }}
+  ]
+}}
+Rules:
+- Always include at least one reason per category.
+- Add reasons even when the evaluation is positive.
+- Use severity "warning" only if confidence_percent < 70 or boolean is false.
+- Keep messages concise and human-readable.
+- Do NOT wrap the JSON in quotes.
+"""
+
+REWRITE_SYSTEM_PROMPT = """
+You rewrite buyer messages to sound more human, casual, and natural.
+
+Rules:
+- Keep the original intent (interest in buying the car).
+- Do NOT add new facts.
+- Do NOT mention that this is a rewrite.
+- Write like a real student or young private buyer.
+- Output EXACTLY ONE sentence.
+- Do NOT exceed {maxtoken} tokens.
+"""
+
+REWRITE_USER_PROMPT_TEMPLATE = """
+Original message:
+"{message}"
+
+Problems detected:
+{problems}
+
+Rewrite the message to fix the problems above.
+Return ONLY the rewritten message, no quotes, no explanations.
+"""
 
 
-class CarInfo(BaseModel):
-    seller: str
-    marke: str
-    modell: str
-    ez: Optional[str] = None
-    getriebe: Optional[str] = None
-    fuel: Optional[str] = None
-    km: Optional[str] = None
-    aufbau: Optional[str] = None
-    preis: Optional[str] = None
-    beschreibung: Optional[str] = ""
-    telefon: Optional[str] = ""
-    buyer: Optional[str] = ""
-    person_type: str  # "person1" or "person2" (decides which prompt to use)
-    max_tokens: Optional[int] = 40  # max tokens for response
+GROK_FIX_VALIDATION_SYSTEM_PROMPT = """
+You rewrite buyer messages to sound more human, casual, and natural.
 
+Rules:
+- Keep the original intent.
+- Fix the listed problems.
+- Ensure ALL required car features are naturally included.
+- Output EXACTLY ONE sentence.
+- Return ONLY the rewritten message.
+- Do NOT return JSON.
+- Do NOT add explanations or quotes.
+- Do NOT exceed {maxtoken} tokens.
+"""
+
+
+GROK_FIX_VALIDATION_USER_PROMPT_TEMPLATE = """
+Original message:
+"{message}"
+
+Problems detected:
+{problems}
+
+Required car features (must all appear in the rewritten message):
+{features}
+
+Rewrite the message following the rules above.
+"""
 
 
 async def verify_password(password: str = Header(None)):
@@ -229,7 +251,7 @@ async def verify_password(password: str = Header(None)):
 
 def fill_placeholders(template: str, fields: dict) -> str:
     """
-    Replace placeholders like {seller}, {marke}, {modell}, {preisvorschlag}, etc.
+    Replace placeholders like {seller}, {make}, {model}, {priceoffer}, etc.
     Template files appear to use these placeholders.
     """
     def safe_replace(match):
@@ -314,7 +336,7 @@ def validate_message(assistant_content: str, car, Greetinglist: List[str], neede
     for feature in needed_features:
         feature_value = str(get_attr(car, feature, "")).lower()
         if feature_value not in assistant_content.lower():
-            errors.append(f"{feature.capitalize()} not mentioned in message")
+            errors.append(f"{feature.capitalize()} not mentioned in message value='{feature_value}'")
 
     # 4. Price logic check (example strategy)
     price = get_attr(car, "preis", None)
@@ -413,58 +435,6 @@ def safe_json_parse(content: str):
     return json.loads(content)
 
 
-REWRITE_SYSTEM_PROMPT = """
-You rewrite buyer messages to sound more human, casual, and natural.
-
-Rules:
-- Keep the original intent (interest in buying the car).
-- Do NOT add new facts.
-- Do NOT mention that this is a rewrite.
-- Write like a real student or young private buyer.
-- Output EXACTLY ONE sentence.
-- Do NOT exceed {maxtoken} tokens.
-"""
-
-REWRITE_USER_PROMPT_TEMPLATE = """
-Original message:
-"{message}"
-
-Problems detected:
-{problems}
-
-Rewrite the message to fix the problems above.
-Return ONLY the rewritten message, no quotes, no explanations.
-"""
-
-
-GROK_FIX_VALIDATION_SYSTEM_PROMPT = """
-You rewrite buyer messages to sound more human, casual, and natural.
-
-Rules:
-- Keep the original intent.
-- Fix the listed problems.
-- Ensure ALL required car features are naturally included.
-- Output EXACTLY ONE sentence.
-- Return ONLY the rewritten message.
-- Do NOT return JSON.
-- Do NOT add explanations or quotes.
-- Do NOT exceed {maxtoken} tokens.
-"""
-
-
-GROK_FIX_VALIDATION_USER_PROMPT_TEMPLATE = """
-Original message:
-"{message}"
-
-Problems detected:
-{problems}
-
-Required car features (must all appear in the rewritten message):
-{features}
-
-Rewrite the message following the rules above.
-"""
-
 def extract_warning_reasons(result: dict):
     """Extract warning messages from the evaluation result."""
     return [
@@ -513,6 +483,9 @@ def Grok_fix_validation_message(message: str, problems: list[str], features: lis
 
     return response.choices[0].message.content.strip()
 
+
+# Endpoints Part
+
 @app.post("/generate-message")
 async def generate_message(
     car: CarInfo,
@@ -557,18 +530,18 @@ async def generate_message(
          # 2) prepare fields dictionary for replacement
         fields = {
             "seller": car.seller,
-            "marke": car.marke,
-            "modell": car.modell,
-            "ez": car.ez or "",
-            "getriebe": car.getriebe or "",
+            "make": car.make,
+            "model": car.model,
+            "year": car.year or "",
+            "gearbox": car.gearbox or "",
             "fuel": car.fuel or "",
             "km": car.km or "",
-            "aufbau": car.aufbau or "",
-            "preis": car.preis or "",
-            "beschreibung": car.beschreibung or "",
-            "telefon": car.telefon or "",
+            "type": car.type or "",
+            "price": car.price or "",
+            "description": car.description or "",
+            "phone": car.phone or "",
             "buyer": car.buyer or "",
-            "preisvorschlag": "",
+            "priceoffer": "",
         }
 
         # --- Convert Features ---
@@ -580,7 +553,7 @@ async def generate_message(
         examples_list_str=  ", ".join(examples)
 
         # Ensure price is a number (float) if it exists
-        preis_value = float(car.preis) if car.preis else None
+        preis_value = float(car.price) if car.price else None
 
         # 3) fill prompt and system
         prompt_parameters = {
@@ -590,8 +563,8 @@ async def generate_message(
         "maxtoken": str(car.max_tokens),
         "seller": car.seller or "",
         "buyer": car.buyer or "",
-        "preis": preis_value,
-        "preisvorschlag": "",
+        "price": preis_value,
+        "priceoffer": "",
         "Examples": examples_list_str
         }
 
@@ -621,7 +594,7 @@ async def generate_message(
         while validation_errors and attempt <= MAX_ATTEMPTS:
             # build corrective prompt that tells the model what to fix
             seller_name = getattr(car, "seller", None) if not isinstance(car, dict) else car.get("seller", None)
-            preis_exists = bool(getattr(car, "preis", None) if not isinstance(car, dict) else car.get("preis", None))
+            preis_exists = bool(getattr(car, "price", None) if not isinstance(car, dict) else car.get("price", None))
             correction_prompt = build_correction_prompt(
                 original_message=final_assistant_content,
                 validation_errors=validation_errors,
