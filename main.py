@@ -29,7 +29,9 @@ AZURE_API_KEY = os.getenv("AZURE_API_KEY")
 AZURE_DEPLOYMENT = os.getenv("AZURE_DEPLOYMENT")
 AZURE_API_VERSION = os.getenv("AZURE_API_VERSION")
 API_PASSWORD = os.getenv("API_PASSWORD")
-
+MIN_SCORE = int(os.getenv("MIN_SCORE", "70"))
+OPENAI_ATTEMPTS = int(os.getenv("OPENAI_ATTEMPTS", "3"))
+GROK_ATTEMPTS = int(os.getenv("GROK_ATTEMPTS", "3"))
 
 # Use env var so Railway mount path can be configured; fallback to local "jsons" for dev.
 JSONS_DIR = Path(os.environ.get("JSONS_DIR", "jsons"))
@@ -37,7 +39,6 @@ JSONS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Allow letters, numbers, hyphen, underscore, and dot
 FILENAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
-MAX_ATTEMPTS = 3
 
 # Initialize Grok client
 grok_client = OpenAI(
@@ -593,7 +594,7 @@ async def generate_message(
         final_assistant_content = normalize_prices_in_text(assistant_content)
         validation_errors = validate_message(final_assistant_content, car, greeting_list, features, blacklist, car.max_tokens)
 
-        while validation_errors and attempt <= MAX_ATTEMPTS:
+        while validation_errors and attempt <= OPENAI_ATTEMPTS:
             # build corrective prompt that tells the model what to fix
             seller_name = getattr(car, "seller", None) if not isinstance(car, dict) else car.get("seller", None)
             preis_exists = bool(getattr(car, "price", None) if not isinstance(car, dict) else car.get("price", None))
@@ -637,22 +638,24 @@ async def generate_message(
             )
     
         # success: return validated message
-        evaluation = evaluate_message("Hello Mia, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable.")
+        # "Hello Mia, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable."
+        # 6) Evaluate final message
+        evaluation = evaluate_message(final_assistant_content)
         overall_confidence = evaluation.get("overall_human_confidence_percent", 0)
 
         is_validated = False
-        # i need to check if overall_confidence is < 70 :
-        if overall_confidence < 70:
+        # i need to check if overall_confidence is < MIN_SCORE :
+        if overall_confidence < MIN_SCORE:
             # Extract warnings reasons
             warnings = extract_warning_reasons(evaluation)
             # Rewrite
-            rewritten_message = rewrite_message("Hello Mia, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable.", warnings, car)
+            rewritten_message = rewrite_message(final_assistant_content, warnings, car)
             
             # Validate rewritten message
             validation_grok = validate_message(rewritten_message, car, greeting_list, features, blacklist, car.max_tokens)
             attempt_grok = 1
 
-            while validation_grok and attempt_grok <= MAX_ATTEMPTS:
+            while validation_grok and attempt_grok <= GROK_ATTEMPTS:
 
                 is_validated = True
                 # Rewrite again
@@ -683,7 +686,7 @@ async def generate_message(
                     "Validated": is_validated
             }
             
-
+        #7) Return final result
         return {
             "message": final_assistant_content,
             "evaluation": evaluation,
