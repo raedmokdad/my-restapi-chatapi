@@ -670,7 +670,7 @@ async def generate_message(
             # Extract warnings reasons
             warnings = extract_warning_reasons(evaluation)
             # Rewrite
-            rewritten_message = rewrite_message("Hello Mia, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable.", warnings)
+            rewritten_message = rewrite_message("Hello Mia, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable.", warnings, car)
             
             # Validate rewritten message
             validation_grok = validate_message(rewritten_message, car, greeting_list, features, blacklist, car.max_tokens)
