@@ -711,7 +711,7 @@ async def generate_message(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error  '{car.person_type}': {e}"
+            detail=f"Error  '{car.person_type}': {e} feature_list: {filtered_features}"
         )
 
 
