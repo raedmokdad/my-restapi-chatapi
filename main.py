@@ -422,7 +422,7 @@ Rules:
 - Do NOT mention that this is a rewrite.
 - Write like a real student or young private buyer.
 - Output EXACTLY ONE sentence.
-- Do NOT exceed 35 words.
+- Do NOT exceed {maxtoken} tokens.
 """
 
 REWRITE_USER_PROMPT_TEMPLATE = """
@@ -436,6 +436,35 @@ Rewrite the message to fix the problems above.
 Return ONLY the rewritten message, no quotes, no explanations.
 """
 
+
+GROK_FIX_VALIDATION_SYSTEM_PROMPT = """
+You rewrite buyer messages to sound more human, casual, and natural.
+
+Rules:
+- Keep the original intent.
+- Fix the listed problems.
+- Ensure ALL required car features are naturally included.
+- Output EXACTLY ONE sentence.
+- Return ONLY the rewritten message.
+- Do NOT return JSON.
+- Do NOT add explanations or quotes.
+- Do NOT exceed {maxtoken} tokens.
+"""
+
+
+GROK_FIX_VALIDATION_USER_PROMPT_TEMPLATE = """
+Original message:
+"{message}"
+
+Problems detected:
+{problems}
+
+Required car features (must all appear in the rewritten message):
+{features}
+
+Rewrite the message following the rules above.
+"""
+
 def extract_warning_reasons(result: dict):
     """Extract warning messages from the evaluation result."""
     return [
@@ -444,19 +473,39 @@ def extract_warning_reasons(result: dict):
         if r.get("severity") == "warning"
     ]
 
-def rewrite_message(original_message: str, warning_reasons: list[str]):
+def rewrite_message(original_message: str, warning_reasons: list[str],car: CarInfo):
     problems_text = "\n".join(f"- {r}" for r in warning_reasons)
 
     response = grok_client.chat.completions.create(
         model="grok-4-1-fast-non-reasoning",
         temperature=0.4,
         messages=[
-            {"role": "system", "content": REWRITE_SYSTEM_PROMPT},
+            {"role": "system", "content": REWRITE_SYSTEM_PROMPT.format(maxtoken=car.max_tokens)},
             {
                 "role": "user",
                 "content": REWRITE_USER_PROMPT_TEMPLATE.format(
                     message=original_message,
                     problems=problems_text
+                )
+            }
+        ],
+    )
+
+    return response.choices[0].message.content.strip()
+
+
+def Grok_fix_validation_message(message: str, problems: list[str], features: list[str], car: CarInfo) -> str:
+    response = grok_client.chat.completions.create(
+        model="grok-4-1-fast-non-reasoning",
+        temperature=0.4,
+        messages=[
+            {"role": "system", "content": GROK_FIX_VALIDATION_SYSTEM_PROMPT.format(maxtoken=car.max_tokens)},
+            {
+                "role": "user",
+                "content": GROK_FIX_VALIDATION_USER_PROMPT_TEMPLATE.format(
+                    message=message,
+                    problems="\n".join(f"- {p}" for p in problems),
+                    features=features
                 )
             }
         ],
@@ -629,7 +678,7 @@ async def generate_message(
 
             while validation_grok and attempt_grok <= MAX_ATTEMPTS:
                 # Rewrite again
-                rewritten_message = rewrite_message(rewritten_message, validation_grok)
+                rewritten_message = Grok_fix_validation_message(rewritten_message, validation_grok, filtered_features, car)
                 # Re-validate
                 validation_grok = validate_message(rewritten_message, car, greeting_list, features, blacklist, car.max_tokens)
                 attempt_grok += 1
