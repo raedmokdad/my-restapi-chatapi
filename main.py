@@ -228,6 +228,7 @@ CRITICAL NON-NEGOTIABLE RULES:
 - Examples:
   - "Manuell" MUST stay "Manuell" (NOT "manual")
   - "Automatik" MUST stay "Automatik"
+  - "Semi Automatik" MUST stay "Semi Automatik"
   - "CRV" MUST stay "CRV"
 
 OUTPUT RULES:
