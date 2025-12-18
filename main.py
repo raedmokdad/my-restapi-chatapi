@@ -616,14 +616,25 @@ async def generate_message(
         evaluation = evaluate_message("Hello Mia, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable.")
         overall_confidence = evaluation.get("overall_human_confidence_percent", 0)
 
-        # i need to check if overall_confidence is > 70 :
+        # i need to check if overall_confidence is < 70 :
         if overall_confidence < 70:
-            # Extract warnings
+            # Extract warnings reasons
             warnings = extract_warning_reasons(evaluation)
-
             # Rewrite
             rewritten_message = rewrite_message("Hello Mia, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable.", warnings)
+            
+            # Validate rewritten message
+            validation_grok = validate_message(rewritten_message, car, greeting_list, features, blacklist, car.max_tokens)
+            attempt_grok = 1
 
+            if validation_grok:
+               raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "validation_errors": validation_grok
+                    }
+               )
+            
             # Re-evaluate
             second_result = evaluate_message(rewritten_message)
             new_score = second_result["overall_human_confidence_percent"]
@@ -633,7 +644,7 @@ async def generate_message(
                     "final_score": new_score,
                     "rewritten": True,
                     "improved": new_score > overall_confidence,
-                    "evaluation": second_result
+                    "evaluation": second_result,
             }
             
 
