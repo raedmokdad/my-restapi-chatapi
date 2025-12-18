@@ -638,6 +638,7 @@ async def generate_message(
         evaluation = evaluate_message("Hello Mia, I am contacting you regarding the 2022 Honda CRV Automatik that you have listed for sale and would like to inform you that I can offer a price of €3675 if this is acceptable.")
         overall_confidence = evaluation.get("overall_human_confidence_percent", 0)
 
+        is_validated = False
         # i need to check if overall_confidence is < 70 :
         if overall_confidence < 70:
             # Extract warnings reasons
@@ -650,6 +651,8 @@ async def generate_message(
             attempt_grok = 1
 
             while validation_grok and attempt_grok <= MAX_ATTEMPTS:
+
+                is_validated = True
                 # Rewrite again
                 rewritten_message = Grok_fix_validation_message(rewritten_message, validation_grok, filtered_features, car)
                 # Re-validate
@@ -676,6 +679,7 @@ async def generate_message(
                     "rewritten": True,
                     "improved": new_score > overall_confidence,
                     "evaluation": second_result,
+                    "Validated": is_validated
             }
             
 
