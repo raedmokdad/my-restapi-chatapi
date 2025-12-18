@@ -226,6 +226,7 @@ CRITICAL NON-NEGOTIABLE RULES:
 - DO NOT normalize spelling or terminology.
 - DO NOT change casing, separators, or word forms.
 - Examples:
+  - "Manuell" MUST stay "Manuell" (NOT "manual")
   - "Automatik" MUST stay "Automatik"
   - "Semi Automatik" MUST stay "Semi Automatik"
   - "CRV" MUST stay "CRV"
