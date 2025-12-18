@@ -627,11 +627,20 @@ async def generate_message(
             validation_grok = validate_message(rewritten_message, car, greeting_list, features, blacklist, car.max_tokens)
             attempt_grok = 1
 
+            while validation_grok and attempt_grok <= MAX_ATTEMPTS:
+                # Rewrite again
+                rewritten_message = rewrite_message(rewritten_message, validation_grok)
+                # Re-validate
+                validation_grok = validate_message(rewritten_message, car, greeting_list, features, blacklist, car.max_tokens)
+                attempt_grok += 1
+
             if validation_grok:
                raise HTTPException(
                     status_code=422,
                     detail={
-                        "validation_errors": validation_grok
+                        "validation_errors": validation_grok,
+                        "assistant_content": rewritten_message,
+                        "attempts": attempt_grok - 1
                     }
                )
             
