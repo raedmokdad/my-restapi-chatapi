@@ -217,10 +217,17 @@ Return ONLY the rewritten message, no quotes, no explanations.
 GROK_FIX_VALIDATION_SYSTEM_PROMPT = """
 You rewrite buyer messages to sound more human, casual, and natural.
 
-Rules:
+CRITICAL RULES (MUST FOLLOW EXACTLY):
 - Keep the original intent.
 - Fix the listed problems.
-- Ensure ALL required car features are naturally included.
+- You MUST use the required car features EXACTLY as written.
+- Do NOT rephrase, translate, normalize, or modify feature values.
+- Do NOT change spelling, casing, separators, or formatting of features.
+- If a feature is "CRV", you MUST write "CRV", not "CR-V".
+- If a feature is "Automatik", you MUST write "Automatik", not "automatic".
+- Ensure ALL required car features are included verbatim.
+
+OUTPUT RULES:
 - Output EXACTLY ONE sentence.
 - Return ONLY the rewritten message.
 - Do NOT return JSON.
@@ -236,7 +243,7 @@ Original message:
 Problems detected:
 {problems}
 
-Required car features (must all appear in the rewritten message):
+Required car features (USE THESE VALUES EXACTLY, do NOT modify them):
 {features}
 
 Rewrite the message following the rules above.
@@ -661,7 +668,7 @@ async def generate_message(
                 # Rewrite again
                 rewritten_message = Grok_fix_validation_message(rewritten_message, validation_grok, filtered_features, car)
                 # Re-validate
-                validation_grok = validate_message(rewritten_message, car, greeting_list, features, blacklist, car.max_tokens)
+                validation_grok = validate_message(rewritten_message, car, greeting_list, filtered_features, blacklist, car.max_tokens)
                 attempt_grok += 1
 
             if validation_grok:
