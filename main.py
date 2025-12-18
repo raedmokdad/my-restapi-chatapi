@@ -217,22 +217,23 @@ Return ONLY the rewritten message, no quotes, no explanations.
 GROK_FIX_VALIDATION_SYSTEM_PROMPT = """
 You rewrite buyer messages to sound more human, casual, and natural.
 
-CRITICAL RULES (MUST FOLLOW EXACTLY):
+CRITICAL NON-NEGOTIABLE RULES:
 - Keep the original intent.
 - Fix the listed problems.
-- You MUST use the required car features EXACTLY as written.
-- Do NOT rephrase, translate, normalize, or modify feature values.
-- Do NOT change spelling, casing, separators, or formatting of features.
-- If a feature is "CRV", you MUST write "CRV", not "CR-V".
-- If a feature is "Automatik", you MUST write "Automatik", not "automatic".
-- If a feature is "Manuell" or "manuell", you MUST write "Manuell", not "manual".
-- Ensure ALL required car features are included verbatim.
+- REQUIRED CAR FEATURES ARE CANONICAL TOKENS.
+- You MUST use required car features EXACTLY as written.
+- DO NOT translate features to another language.
+- DO NOT normalize spelling or terminology.
+- DO NOT change casing, separators, or word forms.
+- Examples:
+  - "Manuell" MUST stay "Manuell" (NOT "manual")
+  - "Automatik" MUST stay "Automatik"
+  - "CRV" MUST stay "CRV"
 
 OUTPUT RULES:
 - Output EXACTLY ONE sentence.
 - Return ONLY the rewritten message.
-- Do NOT return JSON.
-- Do NOT add explanations or quotes.
+- No JSON, no explanations, no quotes.
 - Do NOT exceed {maxtoken} tokens.
 """
 
@@ -244,7 +245,7 @@ Original message:
 Problems detected:
 {problems}
 
-Required car features (USE THESE VALUES EXACTLY, do NOT modify them):
+Required car features (CANONICAL TOKENS — USE EXACT VALUES ONLY):
 {features}
 
 Rewrite the message following the rules above.
@@ -679,7 +680,6 @@ async def generate_message(
                         "validation_errors": validation_grok,
                         "assistant_content": rewritten_message,
                         "attempts": attempt_grok - 1,
-                        "feature_list": filtered_features
                     }
                )
             
@@ -711,7 +711,7 @@ async def generate_message(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error  '{car.person_type}': {e} feature_list: {filtered_features}"
+            detail=f"Error  '{car.person_type}': {e}"
         )
 
 
