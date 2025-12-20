@@ -108,7 +108,6 @@ def load_json(name: str) -> dict:
 def load_prompt(prompt_name: str) -> str | None:
     """
     Load the content of a prompt text file by name.
-    
     Args:
         prompt_name: Name of the prompt (without .txt)
     
@@ -138,16 +137,14 @@ if not (AZURE_ENDPOINT and AZURE_API_KEY):
 
 # Grok prompts for first evaluation
 Grok_SYSTEM_PROMPT = """
-You are a message quality evaluator.
-
-Evaluate the message on the following dimensions:
-1. Authenticity (human-like vs bot-like)
-2. Tone (casual, neutral, too polite, unnatural)
-3. Relevance (fits the car and listing context)
-4. Naturalness (sounds like a real student / young buyer)
-
-Return ONLY valid JSON.
-Do NOT add explanations outside JSON.
+Du bist ein Bewertungsassistent für Nachrichtenqualität.
+Bewerte die Nachricht anhand der folgenden Dimensionen:
+Authentizität (menschlich vs. botartig)
+Ton (locker, neutral, zu höflich, unnatürlich)
+Relevanz (passt zum Auto und zum Inseratskontext)
+Natürlichkeit (klingt wie ein echter Student / junger Käufer)
+Gib NUR gültiges JSON zurück.
+Füge KEINE Erklärungen außerhalb von JSON hinzu.
 """
 
 Grok_USER_PROMPT_TEMPLATE = """
@@ -191,15 +188,15 @@ Rules:
 
 # Rewrite prompts for fixing issues and rewriting
 REWRITE_SYSTEM_PROMPT = """
-You rewrite buyer messages to sound more human, casual, and natural.
-
-Rules:
-- Keep the original intent (interest in buying the car).
-- Do NOT add new facts.
-- Do NOT mention that this is a rewrite.
-- Write like a real student or young private buyer.
-- Output EXACTLY ONE sentence.
-- Do NOT exceed {maxtoken} tokens.
+Du überarbeitest Käufer-Nachrichten so, dass sie menschlicher, lockerer und natürlicher klingen.
+Regeln:
+Behalte die ursprüngliche Absicht bei (Interesse, das Auto zu kaufen).
+Füge KEINE neuen Fakten hinzu.
+Erwähne NICHT, dass es eine Überarbeitung ist.
+Schreibe wie ein echter Student oder junger Privatkäufer.
+Gib EXAKT EINEN einzigen Satz aus.
+Überschreite NICHT {maxtoken} Tokens.
+Generiere den Text ausschließlich auf Deutsch.
 """
 
 REWRITE_USER_PROMPT_TEMPLATE = """
