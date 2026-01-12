@@ -316,6 +316,10 @@ def clean_word(word):
     """Remove punctuation from start and end of a word."""
     return word.strip(string.punctuation)
 
+
+def normalize(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lower())
+
 def validate_message(assistant_content: str, car, Greetinglist: List[str], needed_features: List[str], forbidden_phrases: List[str], max_tokens: Optional[int] = None) -> List[str]:
     
     """Validate the assistant message content.
@@ -334,12 +338,31 @@ def validate_message(assistant_content: str, car, Greetinglist: List[str], neede
     if max_tokens is not None and len(assistant_content.split()) > max_tokens:
         errors.append("Message is too long to max_tokens")
 
-    # 2. Format-check: starts with Greeting + Name
-    first_word = clean_word(assistant_content.split()[0]) if assistant_content else ""
-    second_word = clean_word(assistant_content.split()[1]) if len(assistant_content.split()) > 1 else ""
+    # 2. Format-check: starts with Greeting + Seller Name (multi-word safe)
     seller_name = get_attr(car, "seller", "")
-    if first_word not in Greetinglist or second_word != seller_name:
-        errors.append(f"Message does not start with proper greeting and name ('first_word={first_word}' second_word={second_word} seller_name={seller_name}')")
+    message = assistant_content.strip()
+
+    format_ok = False
+
+    for greeting in Greetinglist:
+        prefix = f"{greeting} {seller_name}"
+        if normalize(message).startswith(normalize(prefix)):
+            format_ok = True
+            break
+
+    if not format_ok:
+        errors.append(
+            f"Message does not start with proper greeting and seller name "
+            f"(expected: '<Greeting> {seller_name}')"
+        )
+
+
+    # # 2. Format-check: starts with Greeting + Name
+    # first_word = clean_word(assistant_content.split()[0]) if assistant_content else ""
+    # second_word = clean_word(assistant_content.split()[1]) if len(assistant_content.split()) > 1 else ""
+    # seller_name = get_attr(car, "seller", "")
+    # if first_word not in Greetinglist or second_word != seller_name:
+    #     errors.append(f"Message does not start with proper greeting and name ('first_word={first_word}' second_word={second_word} seller_name={seller_name}')")
 
     # 3. Feature check: needed features mentioned
     for feature in needed_features:
